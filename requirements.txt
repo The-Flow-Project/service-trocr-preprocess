@@ -1,0 +1,5 @@
+fastapi~=0.109.1
+pydantic~=2.8.2
+uvicorn[standard]
+motor~=3.5.1
+bson
