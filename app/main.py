@@ -1,6 +1,12 @@
+import io
 import logging
+import os.path
+import shutil
+import zipfile
+from tempfile import NamedTemporaryFile
 from asyncio import gather
 from contextlib import asynccontextmanager
+
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from bson import ObjectId
@@ -12,6 +18,7 @@ from fastapi import (
     status,
 )
 from fastapi.encoders import ENCODERS_BY_TYPE
+from fastapi.responses import StreamingResponse
 
 from app.database import mongo_database
 from app.db_connection import (
@@ -24,6 +31,7 @@ from app.worker import preprocess_task
 logger = logging.getLogger('uvicorn')
 
 ENCODERS_BY_TYPE[ObjectId] = str
+logging.basicConfig(level=logging.INFO)
 
 
 @asynccontextmanager
@@ -145,7 +153,7 @@ async def create_preprocess_status(
 )
 async def get_all_preprocess_statuses(
         db: AsyncIOMotorDatabase = Depends(mongo_database),
-) -> list[PreprocessStatusInDB]:
+) -> list:
     """
     Retrieve all preprocess statuses.
 
@@ -156,4 +164,74 @@ async def get_all_preprocess_statuses(
         list[PreprocessStatusInDB]: A list of all found PreprocessStatus objects.
     """
     preprocess_statuses = await db.preprocess_status.find().to_list(length=None)
-    return [PreprocessStatusInDB(id=str(preprocess_status["_id"]), **preprocess_status) for preprocess_status in preprocess_statuses]
+
+    respones = [PreprocessStatusInDB(id=str(preprocess_status["_id"]), **preprocess_status) for preprocess_status in preprocess_statuses]
+    return respones
+
+@app.delete(
+    "/status/{preprocess_id}",
+    response_description="Delete a preprocess status by ObjectID.",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_preprocess_status(
+        preprocess_status: PreprocessStatusInDB = Depends(get_preprocess_status_or_404),
+        db: AsyncIOMotorDatabase = Depends(mongo_database),
+) -> None:
+    """
+    Delete a preprocess status by ObjectID.
+
+    Args:
+        db (AsyncIOMotorDatabase): The MongoDB database connection object, injected by FastAPI.
+        :param db:
+        :param preprocess_status:
+    """
+    folder_path_out = os.path.join(preprocess_status.directory, preprocess_status.out_path, str(preprocess_status.id))
+    folder_path_in = os.path.join(preprocess_status.directory, preprocess_status.in_path, str(preprocess_status.id))
+    if os.path.exists(folder_path_out):
+        shutil.rmtree(folder_path_out)
+    if os.path.exists(folder_path_in):
+        shutil.rmtree(folder_path_in)
+
+    for file in os.listdir('logs'):
+        if file.startswith(str(preprocess_status.id)):
+            os.remove(os.path.join('logs', file))
+
+    await db.preprocess_status.delete_one({"_id": preprocess_status.id})
+
+@app.get(
+    "/files/{preprocess_id}",
+    response_description="Retrieve all files of a preprocess job.",
+)
+async def get_preprocess_files(
+        preprocess_status: PreprocessStatusInDB = Depends(get_preprocess_status_or_404),
+) -> StreamingResponse:
+    """
+    Retrieve all files of a preprocess job.
+
+    Args:
+        preprocess_id (str): The ObjectID of the preprocess status to retrieve files for.
+
+    Returns:
+        dict: A dictionary containing the file names and their content.
+        :param preprocess_status:
+    """
+    folder_path_out = os.path.join(preprocess_status.directory, preprocess_status.out_path, str(preprocess_status.id))
+
+    if not os.path.exists(folder_path_out):
+        raise HTTPException(status_code=404, detail="Files not found")
+
+    zip_bytes_io = io.BytesIO()
+    with zipfile.ZipFile(zip_bytes_io, 'w', zipfile.ZIP_DEFLATED) as zipped:
+        for root, _, files in os.walk(folder_path_out):
+            for filename in files:
+                full_file_path = os.path.join(root, filename)
+                zipped.write(full_file_path, filename)
+
+    response = StreamingResponse(
+        iter([zip_bytes_io.getvalue()]),
+        media_type="application/x-zip-compressed",
+        headers={"Content-Disposition": f"inline;filename=preprocessed_{str(preprocess_status.id)}.zip",
+                 "Content-Length": str(zip_bytes_io.getbuffer().nbytes)}
+    )
+    zip_bytes_io.close()
+    return response
