@@ -38,13 +38,13 @@ class PyObjectId(str):
 
         return ObjectId(value)
 
-
-class PreprocessStatus(BaseModel):
+class PreprocessBaseModel(BaseModel):
     repo_name: str = Field(
         alias="repo_name",
         description="Name of the GitHub-repository.",
         title="Repository-Name",
         examples=["your_github_name/your_repo_name"],
+        frozen=True,
     )
     repo_folder: str = Field(
         alias="repo_folder",
@@ -78,7 +78,7 @@ class PreprocessStatus(BaseModel):
         examples=["tmp"],
     )
     in_path: Optional[str] = Field(
-        default="",
+        default="fetched",
         alias="in_path",
         description="Path to save the fetched files.",
         title="In-Path",
@@ -91,13 +91,29 @@ class PreprocessStatus(BaseModel):
         title="Out-Path",
         examples=["preprocessed"],
     )
+
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
     )
 
+class PreprocessRequestModel(PreprocessBaseModel):
+    password: Optional[str] = Field(
+        alias="password",
+        description="Password to access the status.",
+        title="Password (optional)",
+        default=None,
+    )
+    github_access_token: str = Field(
+        alias="github_access_token",
+        description="Access token to authenticate with the GitHub API.",
+        title="GitHub-Access-Token",
+        examples=["ghp_1234567890"],
+        default=None,
+    )
 
-class PreprocessStatusInDB(PreprocessStatus):
+
+class PreprocessResponseModel(PreprocessBaseModel):
     id: PyObjectId = Field(
         alias="_id",
         description="Unique identifier of the preprocess status.",
@@ -170,4 +186,11 @@ class PreprocessStatusInDB(PreprocessStatus):
         title="Filenames-Failed-Download",
     )
 
-    model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
+
+class PreprocessDBModel(PreprocessResponseModel):
+    password: str = Field(
+        alias="password",
+        description="Password to access the status.",
+        title="Password",
+        default=None,
+    )

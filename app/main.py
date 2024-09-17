@@ -3,7 +3,6 @@ import logging
 import os.path
 import shutil
 import zipfile
-from tempfile import NamedTemporaryFile
 from asyncio import gather
 from contextlib import asynccontextmanager
 
@@ -25,7 +24,7 @@ from app.db_connection import (
     ping_mongo_db_server,
 )
 
-from app.models import PreprocessStatus, PreprocessStatusInDB
+from app.models import PreprocessRequestModel, PreprocessResponseModel, PreprocessDBModel
 from app.worker import preprocess_task
 
 logger = logging.getLogger('uvicorn')
@@ -63,7 +62,7 @@ app = FastAPI(lifespan=lifespan)
 async def get_preprocess_status_or_404(
         preprocess_id: str,
         db: AsyncIOMotorDatabase = Depends(mongo_database),
-) -> PreprocessStatusInDB:
+) -> PreprocessDBModel:
     """
     Retrieve a preprocess status by ObjectID or raise HTTP 404 if not found.
 
@@ -86,16 +85,30 @@ async def get_preprocess_status_or_404(
     if preprocess_status is None:
         raise HTTPException(status_code=404, detail="Preprocess status not found")
 
-    return PreprocessStatusInDB(**preprocess_status)
+    return PreprocessDBModel(**preprocess_status)
+
+
+async def check_password(
+        password: str,
+        preprocess_status: PreprocessDBModel,
+) -> bool:
+    if password is None and preprocess_status.password is not None:
+        raise HTTPException(status_code=401, detail="Password required")
+    if preprocess_status.password != password:
+        raise HTTPException(status_code=401, detail="Invalid password")
+    return True
 
 
 @app.get(
     "/status/{preprocess_id}",
     response_description="Retrieve a preprocess status by ObjectID.",
-    response_model=PreprocessStatusInDB,
+    response_model=PreprocessResponseModel,
     response_model_by_alias=False,
 )
-async def get_preprocess_status(preprocess_status: PreprocessStatusInDB = Depends(get_preprocess_status_or_404)) -> PreprocessStatusInDB:
+async def get_preprocess_status(
+        password: str = None,
+        preprocess_status: PreprocessDBModel = Depends(get_preprocess_status_or_404)
+) -> PreprocessResponseModel:
     """
     Retrieve a preprocess status by ObjectID.
 
@@ -104,51 +117,64 @@ async def get_preprocess_status(preprocess_status: PreprocessStatusInDB = Depend
 
     Returns:
         dict: The found PreprocessStatus object.
+        :param password:
         :param preprocess_status:
     """
     new_status = preprocess_status
-    return new_status
+    password_val = await check_password(password, new_status)
+    if password_val:
+        return PreprocessResponseModel(**new_status.model_dump(by_alias=True, exclude={"password"}))
+    else:
+        raise HTTPException(status_code=401, detail="Invalid password")
 
 
 @app.post(
     "/preprocess",
     response_description="Start a new preprocess job.",
-    response_model=PreprocessStatusInDB,
+    response_model=PreprocessResponseModel,
     response_model_by_alias=False,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_preprocess_status(
-        preprocess_parameters: PreprocessStatus = Body(...),
-        github_access_token: str = Body(...),
+        preprocess_parameters: PreprocessRequestModel = Body(...),
         db: AsyncIOMotorDatabase = Depends(mongo_database),
-) -> PreprocessStatusInDB:
+) -> PreprocessResponseModel:
     """
     Create a new preprocess status.
 
     Args:
         preprocess_parameters (PreprocessStatus): The preprocess status to create.
         db (AsyncIOMotorDatabase): The MongoDB database connection object, injected by FastAPI.
-        github_access_token (str): The GitHub access token to use for the preprocess job.
 
     Returns:
         PreprocessStatusInDB: The created PreprocessStatus object.
     """
-    result = await db.preprocess_status.insert_one(preprocess_parameters.model_dump(by_alias=True))
+    result = await db.preprocess_status.insert_one(
+        preprocess_parameters.model_dump(by_alias=False, exclude={"github_access_token"})
+    )
     created_preprocess_status = await db.preprocess_status.find_one({"_id": result.inserted_id})
 
     if created_preprocess_status:
-        created_preprocess_status = PreprocessStatusInDB(**created_preprocess_status)
+        created_preprocess_status = PreprocessDBModel(
+            id=created_preprocess_status["_id"],
+            **created_preprocess_status
+        )
 
         # Start the preprocess job
-        await preprocess_task(github_access_token, created_preprocess_status, db)
-        return created_preprocess_status
+        await preprocess_task(
+            github_access_token=preprocess_parameters.github_access_token,
+            created_status=created_preprocess_status,
+            db=db,
+        )
+        new_status = await db.preprocess_status.find_one({"_id": result.inserted_id})
+        return PreprocessResponseModel(**new_status)
     else:
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get(
     "/status",
     response_description="Retrieve all preprocess statuses.",
-    response_model=list[PreprocessStatusInDB],
+    response_model=list[PreprocessResponseModel],
     response_model_by_alias=False,
 )
 async def get_all_preprocess_statuses(
@@ -161,11 +187,18 @@ async def get_all_preprocess_statuses(
         db (AsyncIOMotorDatabase): The MongoDB database connection object, injected by FastAPI.
 
     Returns:
-        list[PreprocessStatusInDB]: A list of all found PreprocessStatus objects.
+        list[PreprocessStatusInDB]: A list of all found PreprocessStatus objects without password.
     """
-    preprocess_statuses = await db.preprocess_status.find().to_list(length=None)
+    query = {"password": {"$eq": None, "$exists": True}}
+    preprocess_statuses = await db.preprocess_status.find(query).to_list(length=None)
 
-    respones = [PreprocessStatusInDB(id=str(preprocess_status["_id"]), **preprocess_status) for preprocess_status in preprocess_statuses]
+    respones = [
+        PreprocessResponseModel(
+            id=str(preprocess_status["_id"]),
+            **preprocess_status
+        ).model_dump(by_alias=True)
+        for preprocess_status in preprocess_statuses
+    ]
     return respones
 
 @app.delete(
@@ -174,7 +207,8 @@ async def get_all_preprocess_statuses(
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def delete_preprocess_status(
-        preprocess_status: PreprocessStatusInDB = Depends(get_preprocess_status_or_404),
+        password: str = None,
+        preprocess_status: PreprocessDBModel = Depends(get_preprocess_status_or_404),
         db: AsyncIOMotorDatabase = Depends(mongo_database),
 ) -> None:
     """
@@ -182,28 +216,35 @@ async def delete_preprocess_status(
 
     Args:
         db (AsyncIOMotorDatabase): The MongoDB database connection object, injected by FastAPI.
+        :param password:
         :param db:
         :param preprocess_status:
     """
-    folder_path_out = os.path.join(preprocess_status.directory, preprocess_status.out_path, str(preprocess_status.id))
-    folder_path_in = os.path.join(preprocess_status.directory, preprocess_status.in_path, str(preprocess_status.id))
-    if os.path.exists(folder_path_out):
-        shutil.rmtree(folder_path_out)
-    if os.path.exists(folder_path_in):
-        shutil.rmtree(folder_path_in)
+    password_val = await check_password(password, preprocess_status)
 
-    for file in os.listdir('logs'):
-        if file.startswith(str(preprocess_status.id)):
-            os.remove(os.path.join('logs', file))
+    if password_val:
+        folder_path_out = os.path.join(preprocess_status.directory, preprocess_status.out_path, str(preprocess_status.id))
+        folder_path_in = os.path.join(preprocess_status.directory, preprocess_status.in_path, str(preprocess_status.id))
+        if os.path.exists(folder_path_out):
+            shutil.rmtree(folder_path_out)
+        if os.path.exists(folder_path_in):
+            shutil.rmtree(folder_path_in)
 
-    await db.preprocess_status.delete_one({"_id": preprocess_status.id})
+        for file in os.listdir('logs'):
+            if file.startswith(str(preprocess_status.id)):
+                os.remove(os.path.join('logs', file))
+
+        await db.preprocess_status.delete_one({"_id": preprocess_status.id})
+    else:
+        raise HTTPException(status_code=401, detail="Invalid password")
 
 @app.get(
     "/files/{preprocess_id}",
     response_description="Retrieve all files of a preprocess job.",
 )
 async def get_preprocess_files(
-        preprocess_status: PreprocessStatusInDB = Depends(get_preprocess_status_or_404),
+        password: str = None,
+        preprocess_status: PreprocessDBModel = Depends(get_preprocess_status_or_404),
 ) -> StreamingResponse:
     """
     Retrieve all files of a preprocess job.
@@ -213,25 +254,31 @@ async def get_preprocess_files(
 
     Returns:
         dict: A dictionary containing the file names and their content.
+        :param password:
         :param preprocess_status:
     """
-    folder_path_out = os.path.join(preprocess_status.directory, preprocess_status.out_path, str(preprocess_status.id))
+    password_val = await check_password(password, preprocess_status)
 
-    if not os.path.exists(folder_path_out):
-        raise HTTPException(status_code=404, detail="Files not found")
+    if password_val:
+        folder_path_out = os.path.join(preprocess_status.directory, preprocess_status.out_path, str(preprocess_status.id))
 
-    zip_bytes_io = io.BytesIO()
-    with zipfile.ZipFile(zip_bytes_io, 'w', zipfile.ZIP_DEFLATED) as zipped:
-        for root, _, files in os.walk(folder_path_out):
-            for filename in files:
-                full_file_path = os.path.join(root, filename)
-                zipped.write(full_file_path, filename)
+        if not os.path.exists(folder_path_out):
+            raise HTTPException(status_code=404, detail="Files not found")
 
-    response = StreamingResponse(
-        iter([zip_bytes_io.getvalue()]),
-        media_type="application/x-zip-compressed",
-        headers={"Content-Disposition": f"inline;filename=preprocessed_{str(preprocess_status.id)}.zip",
-                 "Content-Length": str(zip_bytes_io.getbuffer().nbytes)}
-    )
-    zip_bytes_io.close()
-    return response
+        zip_bytes_io = io.BytesIO()
+        with zipfile.ZipFile(zip_bytes_io, 'w', zipfile.ZIP_DEFLATED) as zipped:
+            for root, _, files in os.walk(folder_path_out):
+                for filename in files:
+                    full_file_path = os.path.join(root, filename)
+                    zipped.write(full_file_path, filename)
+
+        response = StreamingResponse(
+            iter([zip_bytes_io.getvalue()]),
+            media_type="application/x-zip-compressed",
+            headers={"Content-Disposition": f"inline;filename=preprocessed_{str(preprocess_status.id)}.zip",
+                     "Content-Length": str(zip_bytes_io.getbuffer().nbytes)}
+        )
+        zip_bytes_io.close()
+        return response
+    else:
+        raise HTTPException(status_code=401, detail="Invalid password")
