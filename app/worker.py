@@ -1,6 +1,5 @@
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from torch.fx.passes.param_fetch import extract_attrs_for_lowering
 
 from app.models import PreprocessDBModel
 from flow_preprocessor.preprocessing_logic.preprocess import Preprocessor
