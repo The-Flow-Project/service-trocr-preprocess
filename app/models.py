@@ -12,6 +12,7 @@ class StateEnum(str, Enum):
     FAILED = "failed"
     DONE = "done"
 
+
 class PyObjectId(str):
     @classmethod
     def __get_pydantic_core_schema__(
@@ -38,6 +39,7 @@ class PyObjectId(str):
 
         return ObjectId(value)
 
+
 class PreprocessBaseModel(BaseModel):
     repo_name: str = Field(
         alias="repo_name",
@@ -61,7 +63,7 @@ class PreprocessBaseModel(BaseModel):
     crop: Optional[bool] = Field(
         default=False,
         alias="crop",
-        description="Whether to crop images to their linemask.",
+        description="Whether to crop images to their line mask.",
         title="Crop",
     )
     stop_on_fail: Optional[bool] = Field(
@@ -96,6 +98,7 @@ class PreprocessBaseModel(BaseModel):
         populate_by_name=True,
         arbitrary_types_allowed=True,
     )
+
 
 class PreprocessRequestModel(PreprocessBaseModel):
     password: Optional[str] = Field(

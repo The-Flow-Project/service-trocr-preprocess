@@ -92,6 +92,14 @@ async def check_password(
         password: str,
         preprocess_status: PreprocessDBModel,
 ) -> bool:
+    """
+
+    :param password:
+    :param preprocess_status:
+    :return:
+    """
+    if password is None and preprocess_status.password == '':
+        return True
     if password is None and preprocess_status.password is not None:
         raise HTTPException(status_code=401, detail="Password required")
     if preprocess_status.password != password:
@@ -150,7 +158,7 @@ async def create_preprocess_status(
         PreprocessStatusInDB: The created PreprocessStatus object.
     """
     result = await db.preprocess_status.insert_one(
-        preprocess_parameters.model_dump(by_alias=False, exclude={"github_access_token"})
+        preprocess_parameters.model_dump(exclude={"github_access_token"})
     )
     created_preprocess_status = await db.preprocess_status.find_one({"_id": result.inserted_id})
 
@@ -170,6 +178,7 @@ async def create_preprocess_status(
         return PreprocessResponseModel(**new_status)
     else:
         raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @app.get(
     "/status",
@@ -191,15 +200,20 @@ async def get_all_preprocess_statuses(
     """
     query = {"password": {"$eq": None, "$exists": True}}
     preprocess_statuses = await db.preprocess_status.find(query).to_list(length=None)
+    query2 = {"password": {"$eq": "", "$exists": True}}
+    preprocess_statuses2 = await db.preprocess_status.find(query2).to_list(length=None)
 
-    respones = [
+    preprocess_statuses.extend(preprocess_statuses2)
+
+    responses = [
         PreprocessResponseModel(
             id=str(preprocess_status["_id"]),
             **preprocess_status
         ).model_dump(by_alias=True)
         for preprocess_status in preprocess_statuses
     ]
-    return respones
+    return responses
+
 
 @app.delete(
     "/status/{preprocess_id}",
@@ -223,8 +237,14 @@ async def delete_preprocess_status(
     password_val = await check_password(password, preprocess_status)
 
     if password_val:
-        folder_path_out = os.path.join(preprocess_status.directory, preprocess_status.out_path, str(preprocess_status.id))
-        folder_path_in = os.path.join(preprocess_status.directory, preprocess_status.in_path, str(preprocess_status.id))
+        folder_path_out = os.path.join(preprocess_status.directory,
+                                       preprocess_status.out_path,
+                                       str(preprocess_status.id)
+                                       )
+        folder_path_in = os.path.join(preprocess_status.directory,
+                                      preprocess_status.in_path,
+                                      str(preprocess_status.id)
+                                      )
         if os.path.exists(folder_path_out):
             shutil.rmtree(folder_path_out)
         if os.path.exists(folder_path_in):
@@ -237,6 +257,7 @@ async def delete_preprocess_status(
         await db.preprocess_status.delete_one({"_id": preprocess_status.id})
     else:
         raise HTTPException(status_code=401, detail="Invalid password")
+
 
 @app.get(
     "/files/{preprocess_id}",
@@ -260,7 +281,10 @@ async def get_preprocess_files(
     password_val = await check_password(password, preprocess_status)
 
     if password_val:
-        folder_path_out = os.path.join(preprocess_status.directory, preprocess_status.out_path, str(preprocess_status.id))
+        folder_path_out = os.path.join(preprocess_status.directory,
+                                       preprocess_status.out_path,
+                                       str(preprocess_status.id)
+                                       )
 
         if not os.path.exists(folder_path_out):
             raise HTTPException(status_code=404, detail="Files not found")
