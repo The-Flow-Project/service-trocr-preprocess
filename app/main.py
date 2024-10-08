@@ -250,9 +250,10 @@ async def delete_preprocess_status(
         if os.path.exists(folder_path_in):
             shutil.rmtree(folder_path_in)
 
-        for file in os.listdir('logs'):
-            if file.startswith(str(preprocess_status.id)):
-                os.remove(os.path.join('logs', file))
+        if os.path.exists('logs'):
+            for file in os.listdir('logs'):
+                if file.startswith(str(preprocess_status.id)):
+                    os.remove(os.path.join('logs', file))
 
         await db.preprocess_status.delete_one({"_id": preprocess_status.id})
     else:

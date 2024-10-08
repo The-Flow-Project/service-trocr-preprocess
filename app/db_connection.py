@@ -4,8 +4,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import urllib.parse
 
 logger = logging.getLogger('uvicorn')
-username = os.getenv('MONGO_INITDB_ROOT_USERNAME')
-password = os.getenv('MONGO_INITDB_ROOT_PASSWORD')
+username = os.getenv('MONGO_USERNAME')
+password = os.getenv('MONGO_PASSWORD')
 encoded_password = urllib.parse.quote_plus(str(password))
 mongo_client = AsyncIOMotorClient(f'mongodb://{username}:{encoded_password}@127.0.0.1:27017')
 
