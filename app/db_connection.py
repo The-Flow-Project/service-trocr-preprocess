@@ -5,8 +5,9 @@ import urllib.parse
 
 logger = logging.getLogger('uvicorn')
 username = os.getenv('MONGO_INITDB_ROOT_USERNAME')
-password = urllib.parse.quote_plus(os.getenv('MONGO_INITDB_ROOT_PASSWORD'))
-mongo_client = AsyncIOMotorClient(f'mongodb://{username}:{password}@127.0.0.1:27017')
+password = os.getenv('MONGO_INITDB_ROOT_PASSWORD')
+encoded_password = urllib.parse.quote_plus(str(password))
+mongo_client = AsyncIOMotorClient(f'mongodb://{username}:{encoded_password}@127.0.0.1:27017')
 
 
 async def ping_mongo_db_server():
