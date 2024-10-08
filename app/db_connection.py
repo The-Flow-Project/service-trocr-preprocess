@@ -1,8 +1,12 @@
+import os
 import logging
 from motor.motor_asyncio import AsyncIOMotorClient
+import urllib.parse
 
 logger = logging.getLogger('uvicorn')
-mongo_client = AsyncIOMotorClient('mongodb://127.0.0.1:27017')
+username = os.getenv('MONGO_INITDB_ROOT_USERNAME')
+password = urllib.parse.quote_plus(os.getenv('MONGO_INITDB_ROOT_PASSWORD'))
+mongo_client = AsyncIOMotorClient(f'mongodb://{username}:{password}@127.0.0.1:27017')
 
 
 async def ping_mongo_db_server():
