@@ -15,6 +15,7 @@ from fastapi import (
     Depends,
     HTTPException,
     status,
+    BackgroundTasks
 )
 from fastapi.encoders import ENCODERS_BY_TYPE
 from fastapi.responses import StreamingResponse
@@ -144,15 +145,17 @@ async def get_preprocess_status(
     status_code=status.HTTP_201_CREATED,
 )
 async def create_preprocess_status(
+        background_tasks: BackgroundTasks,
         preprocess_parameters: PreprocessRequestModel = Body(...),
         db: AsyncIOMotorDatabase = Depends(mongo_database),
-) -> PreprocessResponseModel:
+) -> dict[str, str]:
     """
     Create a new preprocess status.
 
     Args:
         preprocess_parameters (PreprocessStatus): The preprocess status to create.
         db (AsyncIOMotorDatabase): The MongoDB database connection object, injected by FastAPI.
+        background_tasks (BackgroundTasks): The background tasks object, injected by FastAPI.
 
     Returns:
         PreprocessStatusInDB: The created PreprocessStatus object.
@@ -169,13 +172,28 @@ async def create_preprocess_status(
         )
 
         # Start the preprocess job
-        await preprocess_task(
+        background_tasks.add_task(
+            preprocess_task,
             github_access_token=preprocess_parameters.github_access_token,
             created_status=created_preprocess_status,
             db=db,
         )
-        new_status = await db.preprocess_status.find_one({"_id": result.inserted_id})
-        return PreprocessResponseModel(**new_status)
+        # new_status = await db.preprocess_status.find_one({"_id": result.inserted_id})
+        # return PreprocessResponseModel(**new_status)
+        return {
+            "id": str(created_preprocess_status.id),
+            "state": created_preprocess_status.state,
+            "repo_name": created_preprocess_status.repo_name,
+            "repo_folder": created_preprocess_status.repo_folder,
+            "directory": created_preprocess_status.directory,
+            "in_path": created_preprocess_status.in_path,
+            "out_path": created_preprocess_status.out_path,
+            "password": created_preprocess_status.password,
+            "created_at": created_preprocess_status.created_at,
+            "abbrev": created_preprocess_status.abbrev,
+            "crop": created_preprocess_status.crop,
+            "stop_on_fail": created_preprocess_status.stop_on_fail,
+        }
     else:
         raise HTTPException(status_code=500, detail="Internal server error")
 
