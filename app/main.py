@@ -25,7 +25,7 @@ from app.db_connection import (
     ping_mongo_db_server,
 )
 
-from app.models import PreprocessRequestModel, PreprocessResponseModel, PreprocessDBModel
+from app.models import PreprocessRequestModel, PreprocessResponseModel, PreprocessDBModel, PyObjectId
 from app.worker import preprocess_task
 
 logger = logging.getLogger('uvicorn')
@@ -167,7 +167,7 @@ async def create_preprocess_status(
 
     if created_preprocess_status:
         created_preprocess_status = PreprocessDBModel(
-            id=created_preprocess_status["_id"],
+            id=PyObjectId(str(created_preprocess_status["_id"])),
             **created_preprocess_status
         )
 
@@ -225,7 +225,7 @@ async def get_all_preprocess_statuses(
 
     responses = [
         PreprocessResponseModel(
-            id=str(preprocess_status["_id"]),
+            id=PyObjectId(preprocess_status["_id"]),
             **preprocess_status
         ).model_dump(by_alias=True)
         for preprocess_status in preprocess_statuses
