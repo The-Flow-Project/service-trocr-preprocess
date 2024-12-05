@@ -35,8 +35,6 @@ async def preprocess_task(
         created_status: PreprocessDBModel,
         db: AsyncIOMotorDatabase
 ) -> None:
-    preprocessor = Preprocessor()
-
     await update_progress(created_status, db, first=True)
 
     async def callback(progress_update_status: dict) -> None:
@@ -52,8 +50,9 @@ async def preprocess_task(
     created_status_dict["process_id"] = str(created_status_dict["_id"])
     del created_status_dict["_id"]
 
-    await preprocessor.preprocess(
+    preprocessor = Preprocessor(
         **created_status_dict,
         github_access_token=github_access_token,
         callback_preprocess=callback,
     )
+    await preprocessor.preprocess()
