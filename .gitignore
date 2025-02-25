@@ -206,3 +206,6 @@ Temporary Items
 tmp/
 logs/
 not_used_anymore/
+
+# data folder
+data/

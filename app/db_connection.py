@@ -4,6 +4,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import urllib.parse
 
 logger = logging.getLogger('uvicorn')
+
 username = os.getenv('MONGO_USERNAME')
 password = os.getenv('MONGO_PASSWORD')
 encoded_password = urllib.parse.quote_plus(str(password))
@@ -11,6 +12,9 @@ mongo_client = AsyncIOMotorClient(f'mongodb://{username}:{encoded_password}@127.
 
 
 async def ping_mongo_db_server():
+    """
+    Function to check if the mongo server is up and running.
+    """
     try:
         await mongo_client.admin.command('ping')
         logger.info('MongoDB server is up and running - connection successful')

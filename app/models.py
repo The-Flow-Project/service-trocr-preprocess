@@ -1,3 +1,6 @@
+"""
+Models for the preprocessing service.
+"""
 from datetime import datetime
 
 from bson import ObjectId
@@ -8,12 +11,19 @@ from enum import Enum
 
 
 class StateEnum(str, Enum):
+    """
+    Enum class for the state of the process.
+    """
     IN_PROGRESS = "in_progress"
     FAILED = "failed"
     DONE = "done"
 
 
 class PyObjectId(str):
+    """
+    Class to represent an ObjectId as a string.
+    """
+
     @classmethod
     def __get_pydantic_core_schema__(
             cls, _source_type: Any, _handler: Any
@@ -34,6 +44,11 @@ class PyObjectId(str):
 
     @classmethod
     def validate(cls, value) -> ObjectId:
+        """
+        To validate a Pydantic ObjectId.
+        :param value:
+        :return:
+        """
         if not ObjectId.is_valid(value):
             raise ValueError("Invalid ObjectId")
 
@@ -48,10 +63,11 @@ class PreprocessBaseModel(BaseModel):
         examples=["your_github_name/your_repo_name"],
         frozen=True,
     )
-    repo_folder: str = Field(
+    repo_folder: Optional[str] = Field(
+        default="xml",
         alias="repo_folder",
-        description="Folder in the repository the files are fetched from.",
-        title="Repository-Folder",
+        description="Folder in the repository the files are fetched from. Defaults to 'xml'.",
+        title="Repository-Folder (optional)",
         examples=["xml", "page"],
     )
     abbrev: Optional[bool] = Field(
@@ -72,31 +88,11 @@ class PreprocessBaseModel(BaseModel):
         description="Whether to stop processing on failure.",
         title="Stop-On-Fail",
     )
-    directory: Optional[str] = Field(
-        default="tmp",
-        alias="directory",
-        description="Directory to save the files temporarily to.",
-        title="Directory",
-        examples=["tmp"],
-    )
-    in_path: Optional[str] = Field(
-        default="fetched",
-        alias="in_path",
-        description="Path to save the fetched files.",
-        title="In-Path",
-        examples=["fetched"],
-    )
-    out_path: Optional[str] = Field(
-        default="preprocessed",
-        alias="out_path",
-        description="Path to save the preprocessed files.",
-        title="Out-Path",
-        examples=["preprocessed"],
-    )
 
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
+        str_strip_whitespace=True,
     )
 
 
