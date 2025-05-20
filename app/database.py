@@ -1,7 +1,7 @@
 """
 AsyncIOMotorDatabase for FastAPI-app
 """
-from app.db_connection import mongo_client
+from db_connection import mongo_client
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 database = mongo_client.process_status_db

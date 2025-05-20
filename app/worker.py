@@ -1,6 +1,6 @@
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from app.models import PreprocessDBModel, PyObjectId
+from models import PreprocessDBModel, PyObjectId
 from flow_preprocessor.preprocessing_logic.preprocess import Preprocessor
 
 
