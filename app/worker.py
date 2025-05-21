@@ -1,6 +1,6 @@
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from models import PreprocessDBModel, PyObjectId
+from models import PreprocessDBModel
 from flow_preprocessor.preprocessing_logic.preprocess import Preprocessor
 
 
@@ -13,9 +13,6 @@ async def update_progress(status: PreprocessDBModel, db: AsyncIOMotorDatabase, f
         :param status: The status of the preprocess job to update.
         :param db: to connect to the MongoDB.
     """
-    if isinstance(status.id, str):
-        status.id = PyObjectId(status.id)
-
     if first:
         status_dict = status.model_dump(by_alias=True)
     else:
@@ -44,28 +41,9 @@ async def preprocess_task(
     print("Preprocessing started")
     await update_progress(created_status, db, first=True)
 
-    async def callback(progress_update_status: dict) -> None:
-        """
-        Callback method for the preprocessing process to update the progress status.
-
-        :param progress_update_status:
-        """
-        progress_update_status["_id"] = progress_update_status["process_id"]
-        del progress_update_status["process_id"]
-        status_in_db = PreprocessDBModel(**progress_update_status)
-        try:
-            await update_progress(status_in_db, db, first=False)
-        except Exception as e:
-            print(f"Failed to update preprocess status: {e}")
-
     created_status_dict = created_status.model_dump(by_alias=True, exclude={"password"})
-    created_status_dict["process_id"] = str(created_status_dict["_id"])
-    del created_status_dict["_id"]
 
-    preprocessor = Preprocessor(
-        **created_status_dict,
-        github_access_token=github_access_token,
-        callback_preprocess=callback,
-    )
+    # Create the Preprocessor instance, dbcollector is default here
+    preprocessor = Preprocessor(**created_status_dict, github_access_token=github_access_token, datbase=db)
     print("Preprocessor created")
     await preprocessor.preprocess()

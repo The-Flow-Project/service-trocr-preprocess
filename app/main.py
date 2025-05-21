@@ -7,12 +7,12 @@ import os.path
 import zipfile
 from asyncio import gather
 from contextlib import asynccontextmanager
-from typing import Union
+from typing import Union, Any
 from urllib.parse import unquote
 
+from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from bson import ObjectId
 from fastapi import (
     FastAPI,
     Body,
@@ -31,17 +31,16 @@ from db_connection import (
     ping_mongo_db_server,
 )
 
-from models import PreprocessRequestModel, PreprocessResponseModel, PreprocessDBModel, PyObjectId
+from models import PreprocessRequestModel, PreprocessResponseModel, PreprocessDBModel
 from worker import preprocess_task, update_progress
 
 logging.getLogger("fastapi").setLevel(logging.WARNING)
 logging.getLogger("uvicorn").setLevel(logging.WARNING)
 logging.getLogger("pymongo").setLevel(logging.WARNING)
 
-ENCODERS_BY_TYPE[ObjectId] = str
-
 logging.basicConfig(level=logging.WARNING)
 
+ENCODERS_BY_TYPE[ObjectId] = str
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -67,7 +66,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="FLOW-Preprocessing-Microservice", lifespan=lifespan)
-
 
 async def get_preprocess_status_or_404(
         repo_name: str,
@@ -102,7 +100,7 @@ async def get_preprocess_status_or_404(
     return PreprocessDBModel(**preprocess_status)
 
 
-async def check_password(
+def check_password(
         password: str,
         preprocess_status: Union[PreprocessDBModel, dict],
 ) -> bool:
@@ -162,9 +160,9 @@ async def delete_preprocess_data(
     response_model=PreprocessResponseModel,
     response_model_by_alias=False,
 )
-async def get_preprocess_status(
+def get_preprocess_status(
         password: str = None,
-        preprocess_status: PreprocessDBModel = Depends(get_preprocess_status_or_404)
+        preprocess_status: PreprocessDBModel = Depends(get_preprocess_status_or_404),
 ) -> PreprocessResponseModel:
     """
     Retrieve a preprocess status by the GitHub repository name.
@@ -178,9 +176,11 @@ async def get_preprocess_status(
         :param preprocess_status:
     """
     new_status = preprocess_status
-    password_val = await check_password(password, new_status)
+    password_val = check_password(password, new_status)
     if password_val:
-        return PreprocessResponseModel(**new_status.model_dump(by_alias=True, exclude={"password"}))
+        return PreprocessResponseModel(
+            **new_status.model_dump(by_alias=True, exclude={"password"})
+        )
     else:
         raise HTTPException(status_code=401, detail="Invalid password")
 
@@ -196,7 +196,7 @@ async def create_preprocess_status(
         background_tasks: BackgroundTasks,
         preprocess_parameters: PreprocessRequestModel = Body(...),
         db: AsyncIOMotorDatabase = Depends(mongo_database),
-) -> dict[str, str]:
+) -> Any:
     """
     Create a new preprocess status.
 
@@ -209,9 +209,8 @@ async def create_preprocess_status(
         PreprocessStatusInDB: The created PreprocessStatus object.
     """
     preprocess_status = await db.preprocess_status.find_one({"repo_name": preprocess_parameters.repo_name})
-
     if preprocess_status:
-        password_val = await check_password(preprocess_parameters.password, preprocess_status)
+        password_val = check_password(preprocess_parameters.password, preprocess_status)
         if password_val:
             updated_data = {**preprocess_status, **preprocess_parameters.model_dump(by_alias=True)}
             preprocess_status = PreprocessDBModel(**updated_data)
@@ -224,7 +223,7 @@ async def create_preprocess_status(
             preprocess_parameters.model_dump(exclude={"github_access_token"})
         )
         preprocess_status = await db.preprocess_status.find_one({"_id": created.inserted_id})
-        preprocess_status = PreprocessDBModel(_id=PyObjectId(preprocess_status.pop("_id")), **preprocess_status)
+        preprocess_status = PreprocessDBModel(**preprocess_status)
 
     if preprocess_status:
         print("Calling preprocess task")
@@ -236,7 +235,7 @@ async def create_preprocess_status(
             db=db,
         )
         return {
-            "id": str(preprocess_status.id),
+            "id": preprocess_status.id,
             "state": preprocess_status.state,
             "repo_name": preprocess_status.repo_name,
             "repo_folder": preprocess_status.repo_folder,
@@ -284,7 +283,6 @@ async def get_all_preprocess_statuses(
 
     responses = [
         PreprocessResponseModel(
-            _id=PyObjectId(preprocess_status.pop("_id")),
             **preprocess_status
         ).model_dump(by_alias=True)
         for preprocess_status in preprocess_statuses
@@ -311,7 +309,7 @@ async def delete_preprocess_status(
         :param db:
         :param preprocess_status:
     """
-    password_val = await check_password(password, preprocess_status)
+    password_val = check_password(password, preprocess_status)
 
     if password_val:
         await delete_preprocess_data(
@@ -341,7 +339,7 @@ async def get_preprocess_files(
         :param password:
         :param preprocess_status:
     """
-    password_val = await check_password(password, preprocess_status)
+    password_val = check_password(password, preprocess_status)
     flat_repo_name = preprocess_status.repo_name.replace('/', '___')
 
     if password_val:

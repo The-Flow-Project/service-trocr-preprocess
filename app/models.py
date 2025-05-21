@@ -5,8 +5,7 @@ from datetime import datetime
 
 from bson import ObjectId
 from pydantic import BaseModel, Field, ConfigDict
-from pydantic_core import core_schema
-from typing import Optional, List, Any
+from typing import Optional, List
 from enum import Enum
 
 
@@ -17,43 +16,6 @@ class StateEnum(str, Enum):
     IN_PROGRESS = "in_progress"
     FAILED = "failed"
     DONE = "done"
-
-
-class PyObjectId(str):
-    """
-    Class to represent an ObjectId as a string.
-    """
-
-    @classmethod
-    def __get_pydantic_core_schema__(
-            cls, _source_type: Any, _handler: Any
-    ) -> core_schema.CoreSchema:
-        return core_schema.json_or_python_schema(
-            json_schema=core_schema.str_schema(),
-            python_schema=core_schema.union_schema([
-                core_schema.is_instance_schema(ObjectId),
-                core_schema.chain_schema([
-                    core_schema.str_schema(),
-                    core_schema.no_info_plain_validator_function(cls.validate),
-                ])
-            ]),
-            serialization=core_schema.plain_serializer_function_ser_schema(
-                lambda x: str(x)
-            ),
-        )
-
-    @classmethod
-    def validate(cls, value) -> ObjectId:
-        """
-        To validate a Pydantic ObjectId.
-        :param value:
-        :return:
-        """
-        if not ObjectId.is_valid(value):
-            raise ValueError("Invalid ObjectId")
-
-        return ObjectId(value)
-
 
 class PreprocessBaseModel(BaseModel):
     repo_name: str = Field(
@@ -88,6 +50,18 @@ class PreprocessBaseModel(BaseModel):
         description="Whether to stop processing on failure.",
         title="Stop-On-Fail",
     )
+    minwidth: Optional[int] = Field(
+        default=None,
+        alias="min-width",
+        description="Minimum width of the images.",
+        title="Min-Width",
+    )
+    segment: Optional[bool] = Field(
+        alias="segment",
+        description="Whether the images have to be segmented before processing.",
+        title="Segment",
+        default=False
+    )
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -113,7 +87,7 @@ class PreprocessRequestModel(PreprocessBaseModel):
 
 
 class PreprocessResponseModel(PreprocessBaseModel):
-    id: PyObjectId = Field(
+    id: ObjectId = Field(
         alias="_id",
         description="Unique identifier of the preprocess status.",
         title="Preprocess-Status-ID",
@@ -185,6 +159,14 @@ class PreprocessResponseModel(PreprocessBaseModel):
         title="Filenames-Failed-Download",
     )
 
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        str_strip_whitespace=True,
+        json_encoders={
+            ObjectId: str
+        },
+    )
 
 class PreprocessDBModel(PreprocessResponseModel):
     password: str = Field(
