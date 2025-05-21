@@ -1,6 +1,9 @@
 fastapi~=0.109.1
-pydantic~=2.8.2
+pydantic~=2.11.4
 uvicorn[standard]
 motor~=3.5.1
 git+https://github.com/The-Flow-Project/package-preprocessing@main
 git+https://github.com/The-Flow-Project/package-github-api@main
+pymongo~=4.8.0
+flow_preprocessor~=0.4
+pydantic_core~=2.33.2
