@@ -3,11 +3,11 @@ Models for the preprocessing service.
 """
 from datetime import datetime
 
-from bson import ObjectId
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
+from pydantic import BaseModel, BeforeValidator, Field, ConfigDict
+from typing import Annotated, Optional, List
 from enum import Enum
 
+PyObjectId = Annotated[str, BeforeValidator(str)]
 
 class StateEnum(str, Enum):
     """
@@ -87,10 +87,11 @@ class PreprocessRequestModel(PreprocessBaseModel):
 
 
 class PreprocessResponseModel(PreprocessBaseModel):
-    id: ObjectId = Field(
+    id: Optional[PyObjectId] = Field(
         alias="_id",
         description="Unique identifier of the preprocess status.",
         title="Preprocess-Status-ID",
+	default=None,
     )
     created_at: datetime = Field(
         default_factory=datetime.now,
@@ -163,9 +164,6 @@ class PreprocessResponseModel(PreprocessBaseModel):
         populate_by_name=True,
         arbitrary_types_allowed=True,
         str_strip_whitespace=True,
-        json_encoders={
-            ObjectId: str
-        },
     )
 
 class PreprocessDBModel(PreprocessResponseModel):
