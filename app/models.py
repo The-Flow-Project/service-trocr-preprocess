@@ -4,10 +4,11 @@ Models for the preprocessing service.
 from datetime import datetime
 
 from pydantic import BaseModel, BeforeValidator, Field, ConfigDict
-from typing import Annotated, Optional, List
+from typing import Annotated, Optional, List, Dict, Any
 from enum import Enum
 
 PyObjectId = Annotated[str, BeforeValidator(str)]
+
 
 class StateEnum(str, Enum):
     """
@@ -16,6 +17,7 @@ class StateEnum(str, Enum):
     IN_PROGRESS = "in_progress"
     FAILED = "failed"
     DONE = "done"
+
 
 class PreprocessBaseModel(BaseModel):
     repo_name: str = Field(
@@ -91,7 +93,7 @@ class PreprocessResponseModel(PreprocessBaseModel):
         alias="_id",
         description="Unique identifier of the preprocess status.",
         title="Preprocess-Status-ID",
-	default=None,
+        default=None,
     )
     created_at: datetime = Field(
         default_factory=datetime.now,
@@ -165,6 +167,7 @@ class PreprocessResponseModel(PreprocessBaseModel):
         arbitrary_types_allowed=True,
         str_strip_whitespace=True,
     )
+
 
 class PreprocessDBModel(PreprocessResponseModel):
     password: str = Field(
