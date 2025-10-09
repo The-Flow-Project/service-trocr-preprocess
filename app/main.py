@@ -189,6 +189,7 @@ def start_hf_preprocess(
         }
     raise HTTPException(status_code=500, detail="Internal server error - no preprocess status")
 
+
 @app.get(
     "/status",
     response_description="Retrieve all preprocess statuses.",
@@ -196,15 +197,48 @@ def start_hf_preprocess(
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(check_api_key)],
 )
-async def get_all_preprocess_statuses() -> List[PreprocessResponseModel]:
+async def get_all_preprocess_statuses_or_404() -> List[PreprocessResponseModel]:
     """
     Retrieve all preprocess statuses.
 
     Returns:
         List[PreprocessResponseModel]: A list of all preprocess statuses.
+    Raises:
+        HTTPException: If no preprocess statuses are found.
     """
     data = await load_json(env_status_file)
-    return data
+    if len(data) == 0:
+        logging.warning("No preprocess statuses found")
+        raise HTTPException(status_code=404, detail="No preprocess jobs found")
+    else:
+        return data
+
+
+@app.get(
+    "/status/{uuid}",
+    response_description="Retrieve a preprocess status by its UUID.",
+    response_model=PreprocessResponseModel,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(check_api_key)],
+)
+async def get_preprocess_status_or_404(uuid: str) -> PreprocessResponseModel:
+    """
+    Retrieve a preprocess status by its UUID.
+
+    Args:
+        uuid (str): The UUID of the preprocess status to retrieve.
+
+    Returns:
+        PreprocessResponseModel: The preprocess status with the specified UUID.
+
+    Raises:
+        HTTPException: If no preprocess status with the specified UUID is found.
+    """
+    data = await load_json(env_status_file)
+    for item in data:
+        if item.request_id == uuid:
+            return item
+    raise HTTPException(status_code=404, detail="Preprocess job not found")
 
 # @app.get(
 #     "/files/{repo_name:path}",
