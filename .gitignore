@@ -209,3 +209,6 @@ not_used_anymore/
 
 # data folder
 data/
+
+# status json
+preprocessing-status.json
