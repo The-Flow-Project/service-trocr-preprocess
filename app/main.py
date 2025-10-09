@@ -35,6 +35,7 @@ logging.getLogger("uvicorn").setLevel(logging.WARNING)
 logging.basicConfig(level=logging.DEBUG)
 
 api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
+env_status_file = os.getenv("STATUS_FILE", "preprocessing-status.json")
 
 
 async def check_api_key(api_key: str | None = Security(api_key_header)) -> None:
@@ -202,7 +203,7 @@ async def get_all_preprocess_statuses() -> List[PreprocessResponseModel]:
     Returns:
         List[PreprocessResponseModel]: A list of all preprocess statuses.
     """
-    data = await load_json("preprocessing-status.json")
+    data = await load_json(env_status_file)
     return data
 
 # @app.get(

@@ -26,6 +26,7 @@ async def preprocess_task(
     :return: None
     """
     print("Preprocessing started")
+    env_status_file = os.getenv("STATUS_FILE", "preprocessing-status.json")
 
     created_status_dict = created_status.model_dump(
         by_alias=True,
@@ -70,8 +71,6 @@ async def preprocess_task(
             raise e
     print("Preprocessing finished")
 
-    # JSON status file path
-    json_status_file = "preprocessing-status.json"
     segmenter_config = None if created_status.segmenter_config is None \
         else created_status.segmenter_config.json()
 
@@ -103,8 +102,8 @@ async def preprocess_task(
         "average_lines_per_page": preprocessor.stats["avg_lines_per_page"],
     }
 
-    if os.path.exists(json_status_file):
-        async with aiofiles.open(json_status_file, encoding="utf-8") as f:
+    if os.path.exists(env_status_file):
+        async with aiofiles.open(env_status_file, encoding="utf-8") as f:
             try:
                 content = await f.read()
                 data = json.loads(content)
@@ -115,6 +114,6 @@ async def preprocess_task(
 
     data.append(new_entry)
 
-    async with aiofiles.open(json_status_file, "w", encoding="utf-8") as f:
+    async with aiofiles.open(env_status_file, "w", encoding="utf-8") as f:
         content = json.dumps(data, ensure_ascii=False, indent=2, default=str)
         await f.write(content)
