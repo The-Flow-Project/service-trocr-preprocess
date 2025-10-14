@@ -108,9 +108,9 @@ filelock==3.20.0
     #   transformers
 flake8==7.3.0
     # via fuzzy-search
-flow-preprocessing @ git+https://github.com/The-Flow-Project/package-preprocessing@a6fe00092cbc3feba488a9e3add3766e43e5b960
+flow-preprocessing @ git+https://github.com/The-Flow-Project/package-preprocessing@fb3e7c01df21b6fc3cfee6e60ec7fcd939422751
     # via service-trocr-preprocess (pyproject.toml)
-flow-segmenter @ git+https://github.com/The-Flow-Project/package-segmenter@c276ee8aa697fb07d1d8e34d2c8f131022fa8ed9
+flow-segmenter @ git+https://github.com/The-Flow-Project/package-segmenter@f59eb9ae7168c23d0543a42d8cd70c3cf40223eb
     # via flow-preprocessing
 flufl-lock==8.2.0
     # via htrmopo
