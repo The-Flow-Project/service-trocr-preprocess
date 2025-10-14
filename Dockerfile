@@ -1,6 +1,7 @@
 FROM python:3.12-slim
 
-RUN apt-get -y update
+RUN apt-get -y update && apt-get -y upgrade
+RUN apt-get -y install python3-opencv
 RUN apt-get -y install git
 # Set working dir
 WORKDIR /app
