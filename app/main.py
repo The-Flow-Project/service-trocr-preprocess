@@ -19,8 +19,13 @@ from fastapi import (
     Security,
     BackgroundTasks
 )
-# from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse  #, StreamingResponse
 from fastapi.security import APIKeyHeader
+
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
 from models import (
     ZipPreprocessRequestModel,
@@ -90,6 +95,37 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="FLOW-Preprocessing-Microservice", lifespan=lifespan)
 
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["50 per day", "5 per hour", "1/5seconds"],
+)
+
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+def rate_limit_exceeded_handler(_, exc):
+    """
+    Handle rate limit exceeded exceptions.
+
+    :param _: Request - not used
+    :param exc: Exception instance
+    :return: JSONResponse with 429 status code and retry information
+    """
+    retry_after = int(exc.description.split(" ")[-1])
+    response_body = {
+        "detail": "Rate limit exceeded. Please try again later.",
+        "retry_after_seconds": retry_after,
+    }
+    return JSONResponse(
+        status_code=429,
+        content=response_body,
+        headers={"Retry-After": str(retry_after)},
+    )
+
+
+app.add_middleware(SlowAPIMiddleware)
+
 
 @app.post(
     "/preprocess/zip",
@@ -99,6 +135,7 @@ app = FastAPI(title="FLOW-Preprocessing-Microservice", lifespan=lifespan)
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(check_api_key)],
 )
+@limiter.limit("2/minute")
 def start_zip_preprocess(
         background_tasks: BackgroundTasks,
         preprocess_parameters: ZipPreprocessRequestModel = Body(...),
@@ -149,6 +186,7 @@ def start_zip_preprocess(
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(check_api_key)],
 )
+@limiter.limit("2/minute")
 def start_hf_preprocess(
         background_tasks: BackgroundTasks,
         preprocess_parameters: HuggingfacePreprocessRequestModel = Body(...),
@@ -197,6 +235,7 @@ def start_hf_preprocess(
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(check_api_key)],
 )
+@limiter.limit("5/minute")
 async def get_all_preprocess_statuses_or_404() -> List[PreprocessResponseModel]:
     """
     Retrieve all preprocess statuses.
@@ -221,6 +260,7 @@ async def get_all_preprocess_statuses_or_404() -> List[PreprocessResponseModel]:
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(check_api_key)],
 )
+@limiter.limit("5/minute")
 async def get_preprocess_status_or_404(uuid: str) -> PreprocessResponseModel:
     """
     Retrieve a preprocess status by its UUID.

@@ -1,0 +1,52 @@
+[build-system]
+requires = [
+    "setuptools",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "service-trocr-preprocess"
+version = "0.1.0"
+description = "FastAPI service for TrOCR preprocessing"
+readme = { file = "README.md", content-type = "text/markdown" }
+authors = [
+    { name = "Dana Rebecca Meyer", email = "dameyer@techfak.uni-bielefeld.de" },
+    { name = "Jonas Widmer", email = "jonas.widmer@unibe.ch" }
+]
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+dependencies = [
+    "aiofiles>=24.1.0",
+    "fastapi>=0.109.1",
+    "flow-preprocessing",
+    "pydantic>=2.11.4",
+    "slowapi>=0.1.9",
+    "uvicorn[standard]>=0.37.0",
+]
+keywords = [
+    "flow-project",
+    "preprocessing",
+    "htrflow",
+    "digital-humanities",
+    "htr",
+    "handwritten-text-recognition",
+    "datasets",
+    "huggingface",
+    "nlp",
+    "machine-learning",
+    "trocr",
+    "transformers",
+    "fastapi",
+]
+
+[project.urls]
+Homepage = "https://flow-project.net"
+Repository = "https://github.com/The-Flow-Project/service-trocr-preprocess"
+
+[tool.uv.sources]
+flow-preprocessing = { git = "https://github.com/The-Flow-Project/package-preprocessing", rev = "main" }
