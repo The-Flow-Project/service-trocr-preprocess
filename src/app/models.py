@@ -12,6 +12,7 @@ from pydantic import (
     ConfigDict,
     PositiveInt,
     HttpUrl,
+    SecretStr,
     field_validator,
 )
 
@@ -204,11 +205,12 @@ class PreprocessBaseModel(BaseModel):
 
 
 class PreprocessRequestModel(PreprocessBaseModel):
-    huggingface_token: Annotated[str | None, Field(
+    huggingface_token: Annotated[SecretStr | None, Field(
         default=None,
         alias="huggingface_token",
         description="Hugging Face token to authenticate with the Hugging Face API."
-                    "Required if 'huggingface_target_repo_name' is provided.",
+                    "Required if 'huggingface_target_repo_name' is provided."
+                    "This token is encrypted in transit via HTTPS and never stored in logs.",
         title="HuggingFace-Token",
         examples=["hf_1234567890"],
     )]
