@@ -211,5 +211,14 @@ not_used_anymore/
 # data folder
 data/
 
-# status json
+# Storage files (JSON and SQLite)
 preprocessing-status.json
+preprocessing-status.db
+preprocessing-status.lock
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Is handeled by pyproject.toml
+requirements.txt

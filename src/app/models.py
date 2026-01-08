@@ -15,6 +15,27 @@ from pydantic import (
     field_validator,
 )
 
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    """
+    Settings for the preprocessing service.
+    """
+    API_KEY: str
+    STORAGE_TYPE: str = "sqlite"  # Options: sqlite, json
+    STORAGE_PATH: str = "./preprocessing-status.db"
+    JSON_EXPORT_PATH: str = "./preprocessing-status.json"
+
+    # Logging
+    LOG_LEVEL: str = "INFO"
+
+    class Config:
+        """
+        Configuration for the settings.
+        """
+        env_file = ".env"
+
 
 class StateEnum(str, Enum):
     """
@@ -80,26 +101,19 @@ class PreprocessBaseModel(BaseModel):
         description="Whether to crop images to their line mask.",
         title="Crop",
     )]
-    abbrev: Annotated[bool | None, Field(
-        default=False,
-        alias="abbrev",
-        description="Whether to expand in XML available abbreviations."
-                    "Default is False.",
-        title="Abbrev",
-    )]
-    huggingface_new_repo_name: Annotated[str | None, Field(
+    huggingface_target_repo_name: Annotated[str | None, Field(
         default=None,
-        alias="huggingface_new_repo_name",
+        alias="huggingface_target_repo_name",
         description="Name of the new Hugging Face repository to create."
                     "If not provided, there will be no upload to Hugging Face."
-                    "If provided and the repository already exists, it will be updated."
+                    "If provided and the repository already exists, it will be overwritten."
                     "If provided, a Hugging Face token is required.",
-        title="HuggingFace-New-Repo-Name",
+        title="HuggingFace-Repo-Name",
         examples=["my-new-dataset-repo"],
     )]
-    huggingface_new_repo_private: Annotated[bool | None, Field(
+    huggingface_target_repo_private: Annotated[bool | None, Field(
         default=True,
-        alias="huggingface_new_repo_private",
+        alias="huggingface_target_repo_private",
         description="Whether the new Hugging Face repository should be private."
                     "Default is True.",
         title="HuggingFace-New-Repo-Private",
@@ -168,13 +182,18 @@ class PreprocessBaseModel(BaseModel):
                     "Default is True.",
         title="Split-Shuffle",
     )]
-    namespace: Annotated[str | None, Field(
-        default=None,
-        alias="namespace",
-        description="XML namespace to use for the PageXML files."
-                    "Default is 'http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15'.",
-        title="Namespace",
-        examples=["http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15"],
+    batchsize: Annotated[int | None, Field(
+        default=32,
+        alias="batch_size",
+        description="Batchsize for dataset mapping (default: 32).",
+        title="Batchsize",
+    )]
+    append: Annotated[bool | None, Field(
+        default=False,
+        alias="append",
+        description="Whether to append to an existing dataset in the Hugging Face repository."
+                    "If False and the repository exists, it will be overwritten.",
+        title="Append",
     )]
 
     model_config = ConfigDict(
@@ -189,7 +208,7 @@ class PreprocessRequestModel(PreprocessBaseModel):
         default=None,
         alias="huggingface_token",
         description="Hugging Face token to authenticate with the Hugging Face API."
-                    "Required if 'huggingface_new_repo_name' is provided.",
+                    "Required if 'huggingface_target_repo_name' is provided.",
         title="HuggingFace-Token",
         examples=["hf_1234567890"],
     )]
@@ -206,8 +225,8 @@ class ZipPreprocessRequestModel(PreprocessRequestModel):
 
 
 class HuggingfacePreprocessRequestModel(PreprocessRequestModel):
-    huggingface_repo_name: Annotated[str, Field(
-        alias="huggingface_repo_name",
+    huggingface_source_repo_name: Annotated[str, Field(
+        alias="huggingface_source_repo_name",
         description="Name of the Hugging Face repository containing the data export to preprocess."
                     "It has to contain 'xml' and 'image' columns."
                     "If the repository is private, a Hugging Face token is required.",
@@ -282,6 +301,14 @@ class PreprocessResponseModel(PreprocessBaseModel):
 
     @field_validator("source", mode="before")
     def convert_url(cls, v: str | HttpUrl) -> str:
+        """
+
+        Args:
+            v: URL or string to convert to url-string.
+
+        Returns:
+
+        """
         return str(v)
 
     model_config = ConfigDict(

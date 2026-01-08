@@ -1,0 +1,58 @@
+services:
+  trocr-preprocess:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: service-trocr-preprocess
+    ports:
+      - "8000:8000"
+    environment:
+      # API Configuration
+      - API_KEY=${API_KEY:-change_this_key}
+
+      # Storage Configuration
+      - STORAGE_TYPE=${STORAGE_TYPE:-sqlite}
+      - STORAGE_PATH=/data/preprocessing-status.db
+      - JSON_EXPORT_PATH=/data/preprocessing-status.json
+
+      # Optional: Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+    volumes:
+      # Persist data
+      - ./data:/data
+
+      # Optional: Mount app for development (hot reload)
+      # Uncomment for development:
+      # - ./src:/app/src
+
+    restart: unless-stopped
+
+    # Health check
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # Resource limits (optional but recommended for production)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+
+# Optional: Networks for multi-container setups
+networks:
+  default:
+    name: trocr-network
+
+# Volumes for persistent data storage
+volumes:
+  data:
+    driver: local
+
