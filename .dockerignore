@@ -1,0 +1,80 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+fastapi/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Tests
+tests/
+test/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Data & Logs
+data/
+logs/
+*.log
+tmp/
+.tmp/
+
+# Storage files
+preprocessing-status.json
+preprocessing-status.db
+*.db
+*.db-journal
+preprocessing-status.lock
+
+# WICHTIG: uv.lock NICHT ignorieren - wird für reproduzierbare Builds gebraucht!
+# !uv.lock ist bereits erlaubt (kein Eintrag = wird kopiert)
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Docker
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile.dev
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Examples (not needed in container)
+examples/
+
+# Build artifacts
+service_trocr_preprocess.egg-info/
+
