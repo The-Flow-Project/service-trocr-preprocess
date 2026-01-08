@@ -212,7 +212,12 @@ async def start_zip_preprocess(
     Returns:
         dict: Response with message and status information.
     """
-    huggingface_token = preprocess_parameters.huggingface_token
+    # Extract token securely from SecretStr (never logged)
+    huggingface_token = (
+        preprocess_parameters.huggingface_token.get_secret_value()
+        if preprocess_parameters.huggingface_token
+        else None
+    )
 
     preprocess_status = PreprocessResponseModel(
         **preprocess_parameters.model_dump(
@@ -223,7 +228,9 @@ async def start_zip_preprocess(
     logger.info(f"Preprocess status created: {preprocess_status}")
     # Save initial status
     await repository.save(preprocess_status)
-    logger.info(f"Created preprocessing job {preprocess_status.request_id} for ZIP source")
+    logger.info(
+        f"Created preprocessing job {preprocess_status.request_id} for ZIP source"
+    )
 
     # Start the preprocess job
     background_tasks.add_task(
@@ -264,7 +271,12 @@ async def start_hf_preprocess(
     Returns:
         dict: Response with message and status information.
     """
-    huggingface_token = preprocess_parameters.huggingface_token
+    # Extract token securely from SecretStr (never logged)
+    huggingface_token = (
+        preprocess_parameters.huggingface_token.get_secret_value()
+        if preprocess_parameters.huggingface_token
+        else None
+    )
 
     preprocess_status = PreprocessResponseModel(
         **preprocess_parameters.model_dump(
@@ -275,7 +287,10 @@ async def start_hf_preprocess(
 
     # Save initial status
     await repository.save(preprocess_status)
-    logger.info(f"Created preprocessing job {preprocess_status.request_id} for HuggingFace source")
+    logger.info(
+        f"Created preprocessing job {preprocess_status.request_id} "
+        f"for HuggingFace source"
+    )
 
     # Start the preprocess job
     background_tasks.add_task(
