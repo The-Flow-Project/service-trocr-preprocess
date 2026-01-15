@@ -1,10 +1,10 @@
 """
 Main script Flow Preprocessing Service
 """
+import time
 from pathlib import Path
 from typing import List
 from contextlib import asynccontextmanager
-from datetime import datetime
 
 from fastapi import (
     FastAPI,
@@ -17,6 +17,8 @@ from fastapi import (
     Request,
 )
 from fastapi.security import APIKeyHeader
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -37,21 +39,19 @@ from .logging_config import setup_logger
 
 # Configure loguru logger
 settings = Settings()
-setup_logger(level=settings.LOG_LEVEL)
+setup_logger(level=settings.LOG_LEVEL.value)
 
 api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
 
 # Storage configuration
-STORAGE_TYPE = settings.STORAGE_TYPE
-STORAGE_PATH = Path(settings.STORAGE_PATH)
-JSON_EXPORT_PATH = Path(settings.JSON_EXPORT_PATH)
+STORAGE_TYPE = settings.STORAGE_TYPE.value
+STORAGE_PATH = settings.STORAGE_PATH
+JSON_EXPORT_PATH = settings.JSON_EXPORT_PATH
 
 
 def get_repository() -> StatusRepository:
     """
     Dependency function to get the repository from app.state.
-
-    This is a proper Dependency Injection pattern - no global variables!
 
     Returns:
         StatusRepository: The initialized repository instance.
@@ -113,7 +113,7 @@ async def lifespan(app: FastAPI):
     app.state.repository = create_repository(storage_type=STORAGE_TYPE, path=STORAGE_PATH)
     logger.info("Repository initialized successfully")
 
-    # If using SQLite, export to JSON for automation tools like n8n
+    # If using SQLite, export to JSON for automation tools
     if STORAGE_TYPE == "sqlite":
         try:
             await app.state.repository.export_to_json(JSON_EXPORT_PATH)
@@ -141,7 +141,10 @@ async def lifespan(app: FastAPI):
         app.state.repository = None
 
 
-app = FastAPI(title="FLOW-Preprocessing-Microservice", lifespan=lifespan)
+app = FastAPI(
+    title="FLOW-Preprocessing-Microservice",
+    lifespan=lifespan,
+)
 
 limiter = Limiter(
     key_func=get_remote_address,
@@ -152,14 +155,36 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
+# CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(settings.CORS_ALLOWED_ORIGINS),
+    allow_credentials=True,
+    allow_methods=list(settings.CORS_ALLOWED_METHODS),
+    allow_headers=list(settings.CORS_ALLOWED_HEADERS),
+)
+
+if settings.is_production:
+    # HTTPS Redirect Middleware
+    app.add_middleware(HTTPSRedirectMiddleware)
+    logger.info("HTTPS Redirect Middleware enabled for production environment")
+
+    # Disable OpenAPI docs in production
+    app.docs_url = None
+    app.redoc_url = None
+    app.openapi_url = None
+    logger.info("API documentation disabled in production")
+
+logger.info(f"Running in {settings.ENVIRONMENT.value}")
+
 
 # Request-Logging Middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     """
-    Middleware zum Loggen aller HTTP-Requests und Responses.
+    Middleware to log all HTTP-Requests and Responses.
     """
-    start_time = datetime.now()
+    start_time = time.perf_counter()
 
     # Log Request
     logger.debug(f"→ Request: {request.method} {request.url.path}")
@@ -170,7 +195,7 @@ async def log_requests(request: Request, call_next):
         response = await call_next(request)
 
         # Calculate duration
-        duration = (datetime.now() - start_time).total_seconds()
+        duration = time.perf_counter() - start_time
 
         # Log Response
         logger.info(
@@ -180,7 +205,7 @@ async def log_requests(request: Request, call_next):
 
         return response
     except Exception as e:
-        duration = (datetime.now() - start_time).total_seconds()
+        duration = time.perf_counter() - start_time
         logger.error(
             f"✗ Error: {request.method} {request.url.path} "
             f"Duration: {duration:.3f}s Error: {str(e)}"

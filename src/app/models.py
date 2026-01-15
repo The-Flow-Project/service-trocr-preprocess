@@ -3,6 +3,7 @@ Models for the preprocessing service.
 """
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Annotated, Any, Dict
 from uuid import uuid4
 
@@ -14,28 +15,132 @@ from pydantic import (
     HttpUrl,
     SecretStr,
     field_validator,
+    model_validator,
 )
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class StorageTypeEnum(str, Enum):
+    """
+    Enum class for storage types.
+    """
+    SQLITE = "sqlite"
+    JSON = "json"
+
+
+class LogLevelEnum(str, Enum):
+    """Enum for loguru log levels."""
+    TRACE = "TRACE"
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    SUCCESS = "SUCCESS"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+class EnvironmentEnum(str, Enum):
+    """
+    Enum class for different environments.
+    """
+    DEVELOPMENT = "development"
+    PRODUCTION = "production"
 
 
 class Settings(BaseSettings):
     """
     Settings for the preprocessing service.
     """
-    API_KEY: str
-    STORAGE_TYPE: str = "sqlite"  # Options: sqlite, json
-    STORAGE_PATH: str = "./preprocessing-status.db"
-    JSON_EXPORT_PATH: str = "./preprocessing-status.json"
+    API_KEY: Annotated[str | None, Field(
+        default=None,
+        alias="api_key",
+        description="API key for authenticating requests to the preprocessing service."
+                    "If not set, no authentication is required.",
+        title="API-Key",
+        examples=["ThisIsASecure_API_Key1337!"],
+    )]
+
+    ENVIRONMENT: Annotated[EnvironmentEnum, Field(
+        default=EnvironmentEnum.DEVELOPMENT,
+        alias="environment",
+        description="Environment in which the preprocessing service is running."
+                    "Options are 'development' and 'production'."
+                    "In 'development' mode, some security middlewares may be disabled for easier testing.",
+        title="Environment",
+    )]
+
+    # Storage Settings
+    STORAGE_TYPE: Annotated[StorageTypeEnum, Field(
+        default=StorageTypeEnum.SQLITE,
+        alias="storage_type",
+        description="Type of storage to use for preprocessing status (options: sqlite or json).",
+        title="Storage-Type",
+    )]
+    STORAGE_PATH: Annotated[Path, Field(
+        default=Path("./preprocessing-status.db"),
+        alias="storage_path",
+        description="Path to the storage file for preprocessing status.",
+        title="Storage-Path",
+        examples=["./data/preprocessing-status.db", "./data/preprocessing-status.json"],
+    )]
+    JSON_EXPORT_PATH: Annotated[Path, Field(
+        default=Path("./preprocessing-status.json"),
+        alias="json_export_path",
+        description="Path to export the preprocessing status as a JSON file."
+                    "This export is used for automation tools.",
+        title="JSON-Export-Path",
+        examples=["./data/preprocessing-status.json"],
+    )]
 
     # Logging
-    LOG_LEVEL: str = "INFO"
+    LOG_LEVEL: Annotated[LogLevelEnum, Field(
+        default=LogLevelEnum.INFO,
+        alias="log_level",
+        description="Log level for the preprocessing service.",
+        title="Log-Level",
+    )]
 
-    class Config:
+    # CORS Settings
+    CORS_ALLOWED_ORIGINS: Annotated[set[str], Field(
+        default=["*"],
+        alias="cors_allowed_origins",
+        description="Set of allowed origins for CORS. All allowed by default.",
+        title="CORS-Allowed-Origins",
+    )]
+    CORS_ALLOWED_HEADERS: Annotated[set[str], Field(
+        default=["*"],
+        alias="cors_allowed_headers",
+        description="Set of allowed headers for CORS. All allowed by default.",
+        title="CORS-Allowed-Headers",
+    )]
+    CORS_ALLOWED_METHODS: Annotated[set[str], Field(
+        default=["GET", "POST", "OPTIONS"],
+        alias="cors_allowed_methods",
+        description="Set of allowed methods for CORS. GET and POST allowed by default.",
+        title="CORS-Allowed-Methods",
+    )]
+
+    @model_validator(mode="after")
+    def validate_storage_path(self) -> "Settings":
         """
-        Configuration for the settings.
+        Validate the STORAGE_PATH file extension based on STORAGE_TYPE.
         """
-        env_file = ".env"
+        expected_suffix = '.db' if self.STORAGE_TYPE == StorageTypeEnum.SQLITE else '.json'
+
+        if self.STORAGE_PATH.suffix != expected_suffix:
+            self.STORAGE_PATH = self.STORAGE_PATH.with_suffix(expected_suffix)
+
+        return self
+
+    @property
+    def is_production(self) -> bool:
+        """
+        Check if the environment is production.
+        """
+        return self.ENVIRONMENT == EnvironmentEnum.PRODUCTION
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
 class StateEnum(str, Enum):
@@ -96,12 +201,6 @@ class PreprocessBaseModel(BaseModel):
     2. Expert mode fields that are less commonly used.
     """
     # Optional
-    crop: Annotated[bool | None, Field(
-        default=False,
-        alias="crop",
-        description="Whether to crop images to their line mask.",
-        title="Crop",
-    )]
     huggingface_target_repo_name: Annotated[str | None, Field(
         default=None,
         alias="huggingface_target_repo_name",
@@ -118,6 +217,19 @@ class PreprocessBaseModel(BaseModel):
         description="Whether the new Hugging Face repository should be private."
                     "Default is True.",
         title="HuggingFace-New-Repo-Private",
+    )]
+    crop: Annotated[bool | None, Field(
+        default=False,
+        alias="crop",
+        description="Whether to crop images to their line mask.",
+        title="Crop",
+    )]
+    append: Annotated[bool | None, Field(
+        default=False,
+        alias="append",
+        description="Whether to append to an existing dataset in the Hugging Face repository."
+                    "If False and the repository exists, it will be overwritten.",
+        title="Append",
     )]
 
     # Expert Mode Options
@@ -188,13 +300,6 @@ class PreprocessBaseModel(BaseModel):
         alias="batch_size",
         description="Batchsize for dataset mapping (default: 32).",
         title="Batchsize",
-    )]
-    append: Annotated[bool | None, Field(
-        default=False,
-        alias="append",
-        description="Whether to append to an existing dataset in the Hugging Face repository."
-                    "If False and the repository exists, it will be overwritten.",
-        title="Append",
     )]
 
     model_config = ConfigDict(
