@@ -35,6 +35,9 @@ uv pip compile pyproject.toml -o requirements.txt
 Create a `.env` file (see `.env.example`):
 
 ```bash
+# Working mode (production/development)
+ENVIRONMENT=development
+
 # API Key (required)
 API_KEY=your_secret_api_key_here
 
@@ -46,6 +49,14 @@ STORAGE_PATH=./preprocessing-status.db
 
 # JSON export path (for automation tools & HuggingFace)
 JSON_EXPORT_PATH=./preprocessing-status.json
+
+# Log level: TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_LEVEL=INFO
+
+# CORS middleware seetings
+CORS_ALLOWED_ORIGINS='["http://localhost:3000", "http://127.0.0.1:3000"]'
+CORS_ALLOWED_HEADERS='["Content-Type", "X-API-KEY"]'
+CORS_ALLOWED_METHODS='["GET", "POST", "OPTIONS"]'
 ```
 
 ### Storage Options
