@@ -408,7 +408,7 @@ async def get_preprocess_status_or_404(
 
 @app.get("/health")
 @limiter.limit("4/minute")
-async def health_check(request: Request):
+def health_check(request: Request):
     """
     Health check endpoint to verify the service is running.
 

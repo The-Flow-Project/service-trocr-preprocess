@@ -13,8 +13,8 @@ from loguru import logger
 from .models import PreprocessResponseModel, StateEnum
 from .storage import StatusRepository
 
-from flow_preprocessor import ZipPreprocessor, HuggingFacePreprocessor
-from flow_preprocessor.preprocessing_logic.config import PreprocessorConfig
+from flow_preprocessing import ZipPreprocessor, HuggingFacePreprocessor
+from flow_preprocessing.preprocessing_logic.config import PreprocessorConfig
 
 
 async def upload_status_to_huggingface(
