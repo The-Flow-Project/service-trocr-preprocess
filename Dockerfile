@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy dependency files
-COPY pyproject.toml uv.lock /app/
+COPY pyproject.toml /app/
 
 # Install dependencies with uv - way faster!
 # --no-install-workspace: Installs only dependencies, not the local package
@@ -65,6 +65,10 @@ COPY ./src /app/src
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app
+
+# Create data directory for storage
+RUN mkdir -p /data && chown -R appuser:appuser /data
+
 USER appuser
 
 # Expose port
