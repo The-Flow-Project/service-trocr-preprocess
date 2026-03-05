@@ -22,8 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy dependency files
-COPY pyproject.toml /app/
+# Copy dependency files (both pyproject.toml and uv.lock)
+COPY pyproject.toml uv.lock /app/
 
 # Install dependencies with uv - way faster!
 # --no-install-workspace: Installs only dependencies, not the local package

@@ -121,9 +121,14 @@ class SQLModelStatusRepository(StatusRepository):
         self.db_path = db_path
         self._initialized = False
 
+        # Create parent directories if they don't exist
+        # This is essential for Docker containers where /data might not be created yet
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Ensured database directory exists at {self.db_path.parent}")
+
         # Create async engine with proper connection pooling
         # For SQLite, we use StaticPool to avoid threading issues
-        database_url = f"sqlite+aiosqlite:///{db_path}"
+        database_url = f"sqlite+aiosqlite:///{self.db_path}"
         self.engine: AsyncEngine = create_async_engine(
             database_url,
             echo=False,  # Set to True for SQL debugging
@@ -131,7 +136,7 @@ class SQLModelStatusRepository(StatusRepository):
             poolclass=StaticPool,  # Important for SQLite with async
         )
 
-        logger.info(f"SQLModel engine created for {db_path}")
+        logger.info(f"SQLModel engine created for {self.db_path}")
 
     async def _init_db(self) -> None:
         """Initialize the database schema using SQLModel metadata."""
@@ -217,6 +222,9 @@ class SQLModelStatusRepository(StatusRepository):
 
     async def export_to_json(self, output_path: Path, request_id: Optional[str] = None) -> None:
         """Export all or one status to a JSON file for automation tools."""
+        # Ensure output directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
         if request_id:
             status = await self.get_by_id(request_id)
             data = [status.model_dump(by_alias=True, mode='json')] if status else []
@@ -342,6 +350,9 @@ class JSONStatusRepository(StatusRepository):
 
     def __init__(self, json_path: Path):
         self.json_path = json_path
+        # Create parent directories if they don't exist
+        self.json_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Ensured JSON file directory exists at {self.json_path.parent}")
         self._ensure_file_exists()
 
     def _ensure_file_exists(self) -> None:
@@ -404,6 +415,9 @@ class JSONStatusRepository(StatusRepository):
 
     async def export_to_json(self, output_path: Path, request_id: Optional[str] = None) -> None:
         """Export all statuses to a JSON file (essentially a copy)."""
+        # Ensure output directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
         if request_id is not None:
             data_raw = await self.get_by_id(request_id)
             data = [data_raw.model_dump(by_alias=True, mode='json')] if data_raw else []
