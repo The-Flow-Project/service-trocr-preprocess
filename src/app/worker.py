@@ -1,7 +1,6 @@
 """
 This module contains the worker function that handles the preprocessing task.
 """
-from typing import Literal, Optional
 from datetime import datetime
 import json
 from pathlib import Path
@@ -10,16 +9,15 @@ from huggingface_hub import HfApi
 
 from loguru import logger
 
-from .models import PreprocessResponseModel, StateEnum
+from .models import PreprocessResponseModel, PreprocessRequestModel, StateEnum, SourceTypeEnum
 from .storage import StatusRepository
 
 from flow_preprocessing import ZipPreprocessor, HuggingFacePreprocessor
-from flow_preprocessing.preprocessing_logic.config import PreprocessorConfig
 
 
 async def upload_status_to_huggingface(
         status: PreprocessResponseModel,
-        huggingface_token: Optional[str],
+        huggingface_token: str | None,
 ) -> bool:
     """
     Upload preprocessing status as JSON to the HuggingFace dataset.
@@ -73,7 +71,7 @@ async def preprocess_task(
         repository: StatusRepository,
         huggingface_token: str,
         created_status: PreprocessResponseModel,
-        source_type: Literal["zip", "huggingface"],
+        source_type: SourceTypeEnum,
 ) -> None:
     """
     Starting the preprocessing process.
@@ -82,7 +80,7 @@ async def preprocess_task(
         repository: The storage repository for saving status updates.
         huggingface_token: The Hugging Face token to authenticate with the Hugging Face API.
         created_status: The status of the preprocessing when started.
-        source_type: The type of the preprocessing, either "zip" or "huggingface".
+        source_type: The type of the preprocessing, SourceTypeEnum (values: "zip" or "huggingface").
 
     Returns:
         None
@@ -111,21 +109,21 @@ async def preprocess_task(
 
     # Create the Preprocessor instance
     try:
-        preprocessor_config = PreprocessorConfig(
+        preprocessor_config = PreprocessRequestModel(
             huggingface_token=huggingface_token,
             **created_status_dict
         )
-        if source_type == "zip":
+        if source_type == SourceTypeEnum.ZIP:
             preprocessor = ZipPreprocessor(
                 input_path=created_status.source,
                 config=preprocessor_config,
             )
-        else:  # source_type == "huggingface"
+        else:  # source_type == SourceTypeEnum.HUGGINGFACE
             preprocessor = HuggingFacePreprocessor(
                 input_path=created_status.source,
                 config=preprocessor_config,
             )
-        logger.info(f"Preprocessor created for {source_type}")
+        logger.info(f"Preprocessor created for {source_type.value}")
 
         # Run preprocessing
         await preprocessor.preprocess()

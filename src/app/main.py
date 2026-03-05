@@ -31,7 +31,8 @@ from .models import (
     Settings,
     ZipPreprocessRequestModel,
     HuggingfacePreprocessRequestModel,
-    PreprocessResponseModel
+    PreprocessResponseModel,
+    SourceTypeEnum,
 )
 from .worker import preprocess_task
 from .storage import create_repository, StatusRepository
@@ -148,7 +149,7 @@ app = FastAPI(
 
 limiter = Limiter(
     key_func=get_remote_address,
-    default_limits=["100 per day", "4/minute"],
+    default_limits=["100 per day", "10/minute"],
 )
 
 app.state.limiter = limiter
@@ -263,7 +264,7 @@ async def start_zip_preprocess(
         repository=repository,
         huggingface_token=huggingface_token,
         created_status=preprocess_status,
-        source_type='zip',
+        source_type=SourceTypeEnum.ZIP,
     )
 
     return {
@@ -323,7 +324,7 @@ async def start_hf_preprocess(
         repository=repository,
         huggingface_token=huggingface_token,
         created_status=preprocess_status,
-        source_type='huggingface',
+        source_type=SourceTypeEnum.HUGGINGFACE,
     )
 
     return {

@@ -22,7 +22,8 @@ from sqlalchemy.pool import StaticPool
 
 from loguru import logger
 
-from .models import PreprocessResponseModel, StateEnum, SegmenterConfig
+from .models import PreprocessResponseModel, StateEnum
+from flow_preprocessing import SegmenterConfig
 
 
 class PreprocessingStatusDB(SQLModel, table=True):
@@ -49,7 +50,7 @@ class PreprocessingStatusDB(SQLModel, table=True):
     stop_on_fail: bool = Field(default=True)
     min_width_line: Optional[int] = Field(default=None)
     min_height_line: Optional[int] = Field(default=None)
-    segment: bool = Field(default=False)
+    segment: Optional[str] = Field(default=None)
     segmenter_config: Optional[str] = Field(default=None)  # JSON string
     allow_empty_lines: bool = Field(default=False)
     split_train_ratio: Optional[float] = Field(default=None)
@@ -255,15 +256,15 @@ class SQLModelStatusRepository(StatusRepository):
             huggingface_target_repo_name=status.huggingface_target_repo_name,
             huggingface_target_repo_private=status.huggingface_target_repo_private or True,
             stop_on_fail=status.stop_on_fail if status.stop_on_fail is not None else True,
-            min_width_line=status.minwidth,
-            min_height_line=status.minheight,
+            min_width_line=status.min_width_line,
+            min_height_line=status.min_height_line,
             segment=status.segment or False,
             segmenter_config=segmenter_config_json,
             allow_empty_lines=status.allow_empty_lines or False,
             split_train_ratio=status.split_train_ratio,
             split_seed=status.split_seed or 42,
             split_shuffle=status.split_shuffle if status.split_shuffle is not None else True,
-            batch_size=status.batchsize or 32,
+            batch_size=status.batch_size or 32,
             total_pages=status.total_pages,
             total_regions=status.total_regions,
             total_lines=status.total_lines,

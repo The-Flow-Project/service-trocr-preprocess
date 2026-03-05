@@ -4,14 +4,12 @@ Models for the preprocessing service.
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Any, Dict
+from typing import Annotated
 from uuid import uuid4
 
 from pydantic import (
-    BaseModel,
     Field,
     ConfigDict,
-    PositiveInt,
     HttpUrl,
     SecretStr,
     field_validator,
@@ -19,6 +17,10 @@ from pydantic import (
 )
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from flow_preprocessing import (
+    PreprocessorBaseConfig,
+    PreprocessorConfig,
+)
 
 
 class StorageTypeEnum(str, Enum):
@@ -38,6 +40,14 @@ class LogLevelEnum(str, Enum):
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
+
+
+class SourceTypeEnum(str, Enum):
+    """
+    Enum class for different source types.
+    """
+    ZIP = "zip"
+    HUGGINGFACE = "huggingface"
 
 
 class EnvironmentEnum(str, Enum):
@@ -152,154 +162,18 @@ class StateEnum(str, Enum):
     DONE = "completed"
 
 
-class SegmenterConfig(BaseModel):
-    """
-    Configuration for the segmenter.
-    """
-    model_name: Annotated[str | None, Field(
-        default=None,
-        alias="model_name",
-        description="Name of the Hugging Face Yolo model to use for segmentation.",
-        title="Yolo Model-Name",
-        examples=["Riksarkivet/yolov9-lines-within-regions-1"],
-    )]
-    baselines: Annotated[bool, Field(
-        default=False,
-        alias="baselines",
-        description="Whether to create baselines.",
-        title="Baselines",
-    )]
-    creator: Annotated[str | None, Field(
-        default=None,
-        alias="creator",
-        description="Name of the creator to use in the metadata.",
-        title="Creator",
-        examples=["John Doe"],
-    )]
-    yolo_args: Annotated[Dict[str, Any] | None, Field(
-        default=None,
-        alias="yolo_args",
-        description="Additional arguments for the Yolo model."
-                    "See https://docs.ultralytics.com/modes/predict/#inference-arguments for details.",
-        title="Yolo-Args",
-        examples=[{"conf": 0.25, "iou": 0.45}],
-    )]
-
-    model_config = ConfigDict(
-        validate_by_name=True,
-        validate_by_alias=True,
-        arbitrary_types_allowed=True,
-        str_strip_whitespace=True,
-    )
-
-
-class PreprocessBaseModel(BaseModel):
+class PreprocessBaseModel(PreprocessorBaseConfig):
     """
     Base model for preprocess requests (zip and huggingface) and responses.
     Common fields for both requests and responses.
     1. Optional fields that are commonly used.
     2. Expert mode fields that are less commonly used.
     """
-    # Optional
-    huggingface_target_repo_name: Annotated[str | None, Field(
-        default=None,
-        alias="huggingface_target_repo_name",
-        description="Name of the new Hugging Face repository to create."
-                    "If not provided, there will be no upload to Hugging Face."
-                    "If provided and the repository already exists, it will be overwritten."
-                    "If provided, a Hugging Face token is required.",
-        title="HuggingFace-Repo-Name",
-        examples=["my-new-dataset-repo"],
-    )]
-    huggingface_target_repo_private: Annotated[bool | None, Field(
-        default=True,
-        alias="huggingface_target_repo_private",
-        description="Whether the new Hugging Face repository should be private."
-                    "Default is True.",
-        title="HuggingFace-New-Repo-Private",
-    )]
-    crop: Annotated[bool | None, Field(
-        default=False,
-        alias="crop",
-        description="Whether to crop images to their line mask.",
-        title="Crop",
-    )]
-    append: Annotated[bool | None, Field(
-        default=False,
-        alias="append",
-        description="Whether to append to an existing dataset in the Hugging Face repository."
-                    "If False and the repository exists, it will be overwritten.",
-        title="Append",
-    )]
-
-    # Expert Mode Options
-    segment: Annotated[bool | None, Field(
-        default=False,
-        alias="segment",
-        description="Whether the images have to be segmented before processing.",
-        title="Segment",
-    )]
-    segmenter_config: Annotated[SegmenterConfig | None, Field(
-        default=None,
-        alias="segmenter_config",
-        description="Configuration for the segmenter. Required if 'segment' is True.",
-        title="Segmenter-Config",
-    )]
-    stop_on_fail: Annotated[bool | None, Field(
+    stop_on_fail: Annotated[bool, Field(
         default=True,
         alias="stop_on_fail",
-        description="Whether to stop processing on failure.",
+        description="Whether to stop the preprocessing process if an error occurs during preprocessing.",
         title="Stop-On-Fail",
-    )]
-    minwidth: Annotated[PositiveInt | None, Field(
-        default=None,
-        alias="min_width_line",
-        description="Minimum width of the images. Images smaller than this will be skipped.",
-        title="Min-Width",
-    )]
-    minheight: Annotated[PositiveInt | None, Field(
-        default=None,
-        alias="min_height_line",
-        description="Minimum height of the images. Images smaller than this will be skipped.",
-        title="Min-Height",
-    )]
-    allow_empty_lines: Annotated[bool | None, Field(
-        default=False,
-        alias="allow_empty_lines",
-        description="Whether to allow lines without text. Default is False.",
-        title="Allow-Empty-Lines",
-    )]
-    split_train_ratio: Annotated[float | None, Field(
-        default=None,
-        alias="split_train_ratio",
-        description="Ratio of the training set when splitting the dataset into train, validation, and test sets."
-                    "If not provided, no splitting will be done."
-                    "Value must be between 0 and 1.",
-        title="Split-Train-Ratio",
-        examples=[0.8],
-        gt=0.0,
-        lt=1.0,
-    )]
-    split_seed: Annotated[int | None, Field(
-        default=42,
-        alias="split_seed",
-        description="Random seed to use for splitting the dataset into train, validation, and test sets."
-                    "Default is 42.",
-        title="Split-Seed",
-        examples=[1234],
-    )]
-    split_shuffle: Annotated[bool | None, Field(
-        default=True,
-        alias="split_shuffle",
-        description="Whether to shuffle the dataset before splitting into train, validation, and test sets."
-                    "Default is True.",
-        title="Split-Shuffle",
-    )]
-    batchsize: Annotated[int | None, Field(
-        default=32,
-        alias="batch_size",
-        description="Batchsize for dataset mapping (default: 32).",
-        title="Batchsize",
     )]
 
     model_config = ConfigDict(
@@ -407,6 +281,7 @@ class PreprocessResponseModel(PreprocessBaseModel):
     )]
 
     @field_validator("source", mode="before")
+    @classmethod
     def convert_url(cls, v: str | HttpUrl) -> str:
         """
 
@@ -416,7 +291,10 @@ class PreprocessResponseModel(PreprocessBaseModel):
         Returns:
 
         """
-        return str(v)
+        if isinstance(v, HttpUrl):
+            return str(v)
+        else:
+            return v.strip()
 
     model_config = ConfigDict(
         populate_by_name=True,
