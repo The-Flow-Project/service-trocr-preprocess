@@ -93,8 +93,8 @@ async def preprocess_task(
             "crop",
             "huggingface_target_repo_name",
             "huggingface_target_repo_private",
-            "minwidth",
-            "minheight",
+            "min_width_line",
+            "min_height_line",
             "segment",
             "segmenter_config",
             "batch_size",
@@ -126,7 +126,7 @@ async def preprocess_task(
         logger.info(f"Preprocessor created for {source_type.value}")
 
         # Run preprocessing
-        await preprocessor.preprocess()
+        preprocessor.preprocess()
         logger.info(f"Preprocessing completed successfully for request {created_status.request_id}")
 
     except Exception as e:

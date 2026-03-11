@@ -62,15 +62,6 @@ COPY --from=builder /app/.venv /app/.venv
 # Copy application code
 COPY ./src /app/src
 
-# Create non-root user for security
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
-
-# Create data directory for storage
-RUN mkdir -p /data && chown -R appuser:appuser /data
-
-USER appuser
-
 # Expose port
 EXPOSE 8000
 

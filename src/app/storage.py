@@ -23,7 +23,7 @@ from sqlalchemy.pool import StaticPool
 from loguru import logger
 
 from .models import PreprocessResponseModel, StateEnum
-from flow_preprocessing import SegmenterConfig
+from flow_preprocessing import SegmenterConfig, SegmenterBaseConfig
 
 
 class PreprocessingStatusDB(SQLModel, table=True):
@@ -47,6 +47,8 @@ class PreprocessingStatusDB(SQLModel, table=True):
     crop: bool = Field(default=False)
     huggingface_target_repo_name: Optional[str] = Field(default=None)
     huggingface_target_repo_private: bool = Field(default=True)
+    append: bool = Field(default=False)
+    export_mode: Optional[str] = Field(default=None)
     stop_on_fail: bool = Field(default=True)
     min_width_line: Optional[int] = Field(default=None)
     min_height_line: Optional[int] = Field(default=None)
@@ -263,10 +265,11 @@ class SQLModelStatusRepository(StatusRepository):
             crop=status.crop or False,
             huggingface_target_repo_name=status.huggingface_target_repo_name,
             huggingface_target_repo_private=status.huggingface_target_repo_private or True,
+            append=status.append or False,
             stop_on_fail=status.stop_on_fail if status.stop_on_fail is not None else True,
             min_width_line=status.min_width_line,
             min_height_line=status.min_height_line,
-            segment=status.segment or False,
+            segment=status.segment or None,
             segmenter_config=segmenter_config_json,
             allow_empty_lines=status.allow_empty_lines or False,
             split_train_ratio=status.split_train_ratio,
@@ -294,8 +297,11 @@ class SQLModelStatusRepository(StatusRepository):
         """
         # Parse segmenter_config if present
         segmenter_config = None
-        if db_status.segmenter_config:
-            segmenter_config = SegmenterConfig.model_validate_json(db_status.segmenter_config)
+        if db_status.segment is not None and db_status.segmenter_config is not None:
+            if db_status.segment == "kraken":
+                segmenter_config = SegmenterBaseConfig.model_validate_json(db_status.segmenter_config)
+            else:
+                segmenter_config = SegmenterConfig.model_validate_json(db_status.segmenter_config)
 
         return PreprocessResponseModel(
             request_id=db_status.request_id,
@@ -306,16 +312,18 @@ class SQLModelStatusRepository(StatusRepository):
             crop=db_status.crop,
             huggingface_target_repo_name=db_status.huggingface_target_repo_name,
             huggingface_target_repo_private=db_status.huggingface_target_repo_private,
+            append=db_status.append or False,
+            export_mode=db_status.export_mode,
             stop_on_fail=db_status.stop_on_fail,
-            minwidth=db_status.min_width_line,
-            minheight=db_status.min_height_line,
+            min_width_line=db_status.min_width_line,
+            min_height_line=db_status.min_height_line,
             segment=db_status.segment,
             segmenter_config=segmenter_config,
             allow_empty_lines=db_status.allow_empty_lines,
             split_train_ratio=db_status.split_train_ratio,
             split_seed=db_status.split_seed,
             split_shuffle=db_status.split_shuffle,
-            batchsize=db_status.batch_size,
+            batch_size=db_status.batch_size,
             total_pages=db_status.total_pages,
             total_regions=db_status.total_regions,
             total_lines=db_status.total_lines,
