@@ -403,7 +403,8 @@ def health_check(request: Request):
     try:
         if hasattr(app.state, 'repository') and app.state.repository is not None:
             health_data["repository"] = "initialized"
-            health_data["storage_type"] = "json"
+            health_data["storage_type"] = settings.STORAGE_TYPE.value
+            health_data["storage_path"] = str(settings.STORAGE_PATH)
         else:
             health_data["repository"] = "not_initialized"
             health_data["status"] = "degraded"
