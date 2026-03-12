@@ -70,7 +70,7 @@ def upload_status_to_huggingface(
 
 def preprocess_task(
         repository: StatusRepository,
-        huggingface_token: str,
+        huggingface_token: str | None,
         created_status: PreprocessResponseModel,
         source_type: SourceTypeEnum,
 ) -> None:
@@ -79,7 +79,7 @@ def preprocess_task(
 
     Args:
         repository: The storage repository for saving status updates.
-        huggingface_token: The Hugging Face token to authenticate with the Hugging Face API.
+        huggingface_token: The Hugging Face token to authenticate with the Hugging Face API, or None if not provided.
         created_status: The status of the preprocessing when started.
         source_type: The type of the preprocessing, SourceTypeEnum (values: "zip" or "huggingface").
 
