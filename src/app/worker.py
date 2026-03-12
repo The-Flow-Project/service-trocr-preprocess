@@ -15,7 +15,7 @@ from .storage import StatusRepository
 from flow_preprocessing import ZipPreprocessor, HuggingFacePreprocessor
 
 
-async def upload_status_to_huggingface(
+def upload_status_to_huggingface(
         status: PreprocessResponseModel,
         huggingface_token: str | None,
 ) -> bool:
@@ -67,7 +67,7 @@ async def upload_status_to_huggingface(
         return False
 
 
-async def preprocess_task(
+def preprocess_task(
         repository: StatusRepository,
         huggingface_token: str,
         created_status: PreprocessResponseModel,
@@ -126,7 +126,7 @@ async def preprocess_task(
         logger.info(f"Preprocessor created for {source_type.value}")
 
         # Run preprocessing
-        await preprocessor.preprocess()
+        preprocessor.preprocess()
         logger.info(f"Preprocessing completed successfully for request {created_status.request_id}")
 
     except Exception as e:
@@ -135,7 +135,7 @@ async def preprocess_task(
 
         # Update status in repository
         created_status.runtime_seconds = (datetime.now() - created_status.created_at).total_seconds()
-        await repository.save(created_status)
+        repository.save(created_status)
 
         if created_status.stop_on_fail:
             raise
@@ -155,12 +155,12 @@ async def preprocess_task(
         created_status.average_lines_per_page = stats_cache.get("avg_lines_per_page", 0.0)
 
     # Save final status to repository
-    await repository.save(created_status)
+    repository.save(created_status)
     logger.info(f"Final status saved for request {created_status.request_id}")
 
     # Upload status to HuggingFace dataset so creator can see what happened
     if created_status.huggingface_target_repo_name:
-        upload_success = await upload_status_to_huggingface(
+        upload_success = upload_status_to_huggingface(
             status=created_status,
             huggingface_token=huggingface_token,
         )

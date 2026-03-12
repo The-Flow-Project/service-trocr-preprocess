@@ -2,7 +2,6 @@
 Main script Flow Preprocessing Service
 """
 import time
-from pathlib import Path
 from typing import List
 from contextlib import asynccontextmanager
 
@@ -20,12 +19,12 @@ from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 
+from loguru import logger
+
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
-
-from loguru import logger
 
 from .models import (
     Settings,
@@ -45,7 +44,6 @@ setup_logger(level=settings.LOG_LEVEL.value)
 api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
 
 # Storage configuration
-STORAGE_TYPE = settings.STORAGE_TYPE.value
 STORAGE_PATH = settings.STORAGE_PATH
 JSON_EXPORT_PATH = settings.JSON_EXPORT_PATH
 
@@ -110,17 +108,9 @@ async def lifespan(app: FastAPI):
         None: This function does not yield any value.
     """
     # Startup - Store repository in app.state
-    logger.info(f"Initializing {STORAGE_TYPE} repository at {STORAGE_PATH}")
-    app.state.repository = create_repository(storage_type=STORAGE_TYPE, path=STORAGE_PATH)
+    logger.info(f"Initializing repository at {STORAGE_PATH}")
+    app.state.repository = create_repository(path=STORAGE_PATH)
     logger.info("Repository initialized successfully")
-
-    # If using SQLite, export to JSON for automation tools
-    if STORAGE_TYPE == "sqlite":
-        try:
-            await app.state.repository.export_to_json(JSON_EXPORT_PATH)
-            logger.info(f"Exported initial status to {JSON_EXPORT_PATH}")
-        except Exception as e:
-            logger.warning(f"Could not export to JSON: {e}")
 
     yield
 
@@ -128,13 +118,13 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down service...")
 
     try:
-        await app.state.repository.export_to_json(JSON_EXPORT_PATH)
+        app.state.repository.export_to_json(JSON_EXPORT_PATH)
         logger.info(f"Exported final status to {JSON_EXPORT_PATH}")
     except Exception as e:
         logger.error(f"Failed to export to JSON on shutdown: {e}")
 
     try:
-        await app.state.repository.close()
+        app.state.repository.close()
         logger.info("Repository closed successfully")
     except Exception as e:
         logger.error(f"Failed to close repository: {e}")
@@ -253,7 +243,7 @@ async def start_zip_preprocess(
     )
     logger.info(f"Preprocess status created: {preprocess_status}")
     # Save initial status
-    await repository.save(preprocess_status)
+    repository.save(preprocess_status)
     logger.info(
         f"Created preprocessing job {preprocess_status.request_id} for ZIP source"
     )
@@ -312,7 +302,7 @@ async def start_hf_preprocess(
     )
 
     # Save initial status
-    await repository.save(preprocess_status)
+    repository.save(preprocess_status)
     logger.info(
         f"Created preprocessing job {preprocess_status.request_id} "
         f"for HuggingFace source"
@@ -354,17 +344,10 @@ async def get_all_preprocess_statuses_or_404(
     Raises:
         HTTPException: If no preprocess statuses are found.
     """
-    data = await repository.get_all()
+    data = repository.get_all()
     if len(data) == 0:
         logger.info("No preprocess statuses found")
         raise HTTPException(status_code=404, detail="No preprocess jobs found")
-
-    # Export to JSON for automation tools
-    if STORAGE_TYPE == "sqlite":
-        try:
-            await repository.export_to_json(JSON_EXPORT_PATH)
-        except Exception as e:
-            logger.warning(f"Could not export to JSON: {e}")
 
     return data
 
@@ -393,16 +376,10 @@ async def get_preprocess_status_or_404(
     Raises:
         HTTPException: If no preprocess status with the specified UUID is found.
     """
-    status_obj = await repository.get_by_id(uuid)
+    status_obj = repository.get_by_id(uuid)
     if not status_obj:
         logger.info(f"Preprocess job not found: {uuid}")
         raise HTTPException(status_code=404, detail="Preprocess job not found")
-
-    try:
-        id_path = Path(JSON_EXPORT_PATH.name + f"-{uuid}.json")
-        await repository.export_to_json(id_path, request_id=uuid)
-    except Exception as e:
-        logger.warning(f"Could not export to JSON: {e}")
 
     return status_obj
 
@@ -427,7 +404,7 @@ def health_check(request: Request):
     try:
         if hasattr(app.state, 'repository') and app.state.repository is not None:
             health_data["repository"] = "initialized"
-            health_data["storage_type"] = STORAGE_TYPE
+            health_data["storage_type"] = "json"
         else:
             health_data["repository"] = "not_initialized"
             health_data["status"] = "degraded"
