@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 from huggingface_hub import HfApi
+from fastapi.concurrency import run_in_threadpool
 
 from loguru import logger
 
@@ -93,8 +94,8 @@ def preprocess_task(
             "crop",
             "huggingface_target_repo_name",
             "huggingface_target_repo_private",
-            "minwidth",
-            "minheight",
+            "min_width_line",
+            "min_height_line",
             "segment",
             "segmenter_config",
             "batch_size",

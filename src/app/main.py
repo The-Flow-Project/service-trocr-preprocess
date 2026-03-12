@@ -131,7 +131,6 @@ async def lifespan(app: FastAPI):
     finally:
         app.state.repository = None
 
-
 app = FastAPI(
     title="FLOW-Preprocessing-Microservice",
     lifespan=lifespan,

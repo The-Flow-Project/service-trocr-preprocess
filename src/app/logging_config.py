@@ -22,8 +22,9 @@ def setup_logger(level: str = "DEBUG") -> None:
         format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
         level=level,
         colorize=True,
-        backtrace=True,
-        diagnose=True,
+        backtrace=False,
+        diagnose=False,
+        enqueue=True,
     )
 
     # File handler for all logs with rotation

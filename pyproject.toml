@@ -60,4 +60,4 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.dynamic]
-version = { attr = "app.__version__.__version__" }
+version = { attr = "app.__version__" }
