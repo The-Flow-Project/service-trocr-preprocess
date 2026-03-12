@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 from huggingface_hub import HfApi
+from fastapi.concurrency import run_in_threadpool
 
 from loguru import logger
 
@@ -126,7 +127,7 @@ async def preprocess_task(
         logger.info(f"Preprocessor created for {source_type.value}")
 
         # Run preprocessing
-        preprocessor.preprocess()
+        await run_in_threadpool(preprocessor.preprocess)
         logger.info(f"Preprocessing completed successfully for request {created_status.request_id}")
 
     except Exception as e:

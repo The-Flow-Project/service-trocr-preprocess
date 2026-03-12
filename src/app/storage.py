@@ -15,8 +15,6 @@ import aiofiles
 
 from sqlmodel import Field, SQLModel, select, col
 from sqlmodel.ext.asyncio.session import AsyncSession
-# Note: SQLModel uses SQLAlchemy's async engine under the hood
-# This is the official way according to SQLModel docs for async support
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
 from sqlalchemy.pool import StaticPool
 
@@ -262,6 +260,7 @@ class SQLModelStatusRepository(StatusRepository):
             state=status.state.value,
             created_at=status.created_at.isoformat(),
             runtime_seconds=status.runtime_seconds,
+            export_mode=status.export_mode,
             crop=status.crop or False,
             huggingface_target_repo_name=status.huggingface_target_repo_name,
             huggingface_target_repo_private=status.huggingface_target_repo_private or True,
