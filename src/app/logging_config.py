@@ -31,6 +31,11 @@ def setup_logger(level: str = "DEBUG") -> None:
     logs_dir = Path("logs")
     logs_dir.mkdir(parents=True, exist_ok=True)
 
+    if level == "DEBUG":
+        diagnose = True
+    else:
+        diagnose = False
+
     logger.add(
         logs_dir / "app.log",
         rotation="5 MB",
@@ -38,7 +43,7 @@ def setup_logger(level: str = "DEBUG") -> None:
         level="DEBUG",
         format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
         backtrace=True,
-        diagnose=True,
+        diagnose=diagnose,
         enqueue=True,  # Thread-safe logging
     )
 
@@ -50,7 +55,7 @@ def setup_logger(level: str = "DEBUG") -> None:
         level="ERROR",
         format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
         backtrace=True,
-        diagnose=True,
+        diagnose=diagnose,
         enqueue=True,
     )
 
