@@ -282,7 +282,7 @@ async def start_zip_preprocess(
         background_tasks: BackgroundTasks,
         preprocess_parameters: ZipPreprocessRequestModel = Body(...),
         repository: StatusRepository = Depends(get_repository),
-) -> dict:
+) -> PreprocessResponseModel:
     """
     Start a new preprocess job with a ZIP-URL.
 
@@ -292,19 +292,14 @@ async def start_zip_preprocess(
         repository: The storage repository, injected via dependency injection.
 
     Returns:
-        dict: Response with message and status information.
+        PreprocessResponseModel: The status of the newly created preprocess job.
     """
-    preprocess_status = _create_and_start_preprocess(
+    return _create_and_start_preprocess(
         background_tasks=background_tasks,
         preprocess_parameters=preprocess_parameters,
         repository=repository,
         source_type=SourceTypeEnum.ZIP,
     )
-
-    return {
-        "message": "Preprocess job started",
-        **preprocess_status.model_dump(by_alias=True),
-    }
 
 
 @app.post(
@@ -319,7 +314,7 @@ async def start_hf_preprocess(
         background_tasks: BackgroundTasks,
         preprocess_parameters: HuggingfacePreprocessRequestModel = Body(...),
         repository: StatusRepository = Depends(get_repository),
-) -> dict:
+) -> PreprocessResponseModel:
     """
     Start a new preprocess job with a HuggingFace repository name.
 
@@ -329,19 +324,14 @@ async def start_hf_preprocess(
         repository: The storage repository, injected via dependency injection.
 
     Returns:
-        dict: Response with message and status information.
+        PreprocessResponseModel: The status of the newly created preprocess job.
     """
-    preprocess_status = _create_and_start_preprocess(
+    return _create_and_start_preprocess(
         background_tasks=background_tasks,
         preprocess_parameters=preprocess_parameters,
         repository=repository,
         source_type=SourceTypeEnum.HUGGINGFACE,
     )
-
-    return {
-        "message": "Preprocess job started",
-        **preprocess_status.model_dump(by_alias=True),
-    }
 
 
 @app.get(
