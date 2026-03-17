@@ -35,13 +35,10 @@ The service uses a **JSON-based storage backend** for persisting preprocessing s
 │  preprocessing-      │
 │  status.json         │  Primary storage file
 └──────────────────────┘
-           │
+           ▲
            │  export_to_json() on shutdown
-           ▼
-┌──────────────────────┐
-│  JSON Export         │
-│  (for Automation)    │  Separate export file (configurable path)
-└──────────────────────┘
+           │  (writes back to primary storage file at STORAGE_PATH)
+
 ```
 
 ---
@@ -59,17 +56,14 @@ API_KEY=your_secret_api_key
 # Storage type (currently only "json" is supported)
 STORAGE_TYPE=json
 
-# Path to the primary JSON storage file
+# Path to the primary JSON storage file (also used for shutdown export)
 STORAGE_PATH=./preprocessing-status.json
-
-# Path for the separate JSON export (for automation tools)
-JSON_EXPORT_PATH=./preprocessing-status.json
 
 # Log level
 LOG_LEVEL=INFO
 ```
 
-> **Note:** `STORAGE_PATH` must have a `.json` extension. The service validates this on startup and will raise an error otherwise.
+> **Note:** `STORAGE_PATH` must have a `.json` extension. The service validates this on startup and will raise an error otherwise. The shutdown JSON export is also written to this same path.
 
 ---
 
