@@ -46,8 +46,8 @@ The project uses `uv` for fast package management.
 - **Environment**: Ensure `.env` exists (copy from `.env.example`). Key variables:
   - `API_KEY`: Required for all authenticated endpoints.
   - `STORAGE_TYPE`: `json` (currently the only supported option).
-  - `STORAGE_PATH`: Path to the JSON storage file (must have `.json` extension).
-  - `JSON_EXPORT_PATH`: Path for the separate JSON export (written on shutdown).
+  - `STORAGE_PATH`: Path to the JSON storage file (must have `.json` extension). Exports are also written here; there is no separate `JSON_EXPORT_PATH` setting.
+
 
 ### Testing
 - No explicit `tests/` folder. Manual API testing via `/docs` (Swagger UI, development only) or `curl`.
