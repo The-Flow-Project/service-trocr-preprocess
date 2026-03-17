@@ -48,8 +48,7 @@ STORAGE_TYPE=json
 # Storage file path (must have .json extension)
 STORAGE_PATH=./preprocessing-status.json
 
-# JSON export path (for automation tools, written on shutdown)
-JSON_EXPORT_PATH=./preprocessing-status.json
+# JSON export uses the same file as STORAGE_PATH (e.g. for automation tools)
 
 # Log level: TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_LEVEL=INFO
