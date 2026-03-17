@@ -146,7 +146,7 @@ class StatusRepository:
         pass
 
 
-def create_repository(path: Path = None) -> StatusRepository:
+def create_repository(path: Path | None = None) -> StatusRepository:
     """
     Factory function to create a status repository.
 
