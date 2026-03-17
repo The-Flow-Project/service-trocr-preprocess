@@ -115,7 +115,7 @@ def save(self, status: PreprocessResponseModel) -> None:
         self._save_to_file()
 ```
 
-Read operations (`get_by_id`, `get_all`) access the in-memory dict directly without locking, which is safe for Python's GIL-protected dict reads.
+Read operations (`get_by_id`, `get_all`) also acquire `self._lock` before accessing the in-memory dict, ensuring thread-safe and consistent reads alongside writes.
 
 ---
 
