@@ -17,17 +17,28 @@ from pydantic import (
 )
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from flow_preprocessing import (
-    PreprocessorBaseConfig,
-    PreprocessorConfig,
-)
+from flow_preprocessing import PreprocessorBaseConfig
+
+__all__ = [
+    "StorageTypeEnum",
+    "LogLevelEnum",
+    "SourceTypeEnum",
+    "EnvironmentEnum",
+    "Settings",
+    "StateEnum",
+    "PreprocessBaseModel",
+    "PreprocessRequestModel",
+    "ZipPreprocessRequestModel",
+    "HuggingfacePreprocessRequestModel",
+    "PreprocessResponseModel",
+]
 
 
 class StorageTypeEnum(str, Enum):
     """
     Enum class for storage types.
     """
-    SQLITE = "sqlite"
+    # SQLITE = "sqlite"
     JSON = "json"
 
 
@@ -82,24 +93,16 @@ class Settings(BaseSettings):
 
     # Storage Settings
     STORAGE_TYPE: Annotated[StorageTypeEnum, Field(
-        default=StorageTypeEnum.SQLITE,
+        default=StorageTypeEnum.JSON,
         alias="storage_type",
-        description="Type of storage to use for preprocessing status (options: sqlite or json).",
+        description="Type of storage to use for preprocessing status (atm only json).",
         title="Storage-Type",
     )]
     STORAGE_PATH: Annotated[Path, Field(
-        default=Path("./preprocessing-status.db"),
+        default=Path("./preprocessing-status.json"),
         alias="storage_path",
         description="Path to the storage file for preprocessing status.",
         title="Storage-Path",
-        examples=["./data/preprocessing-status.db", "./data/preprocessing-status.json"],
-    )]
-    JSON_EXPORT_PATH: Annotated[Path, Field(
-        default=Path("./preprocessing-status.json"),
-        alias="json_export_path",
-        description="Path to export the preprocessing status as a JSON file."
-                    "This export is used for automation tools.",
-        title="JSON-Export-Path",
         examples=["./data/preprocessing-status.json"],
     )]
 
@@ -113,7 +116,7 @@ class Settings(BaseSettings):
 
     # CORS Settings
     CORS_ALLOWED_ORIGINS: Annotated[set[str], Field(
-        default=["*"],
+        default={"*"},
         alias="cors_allowed_origins",
         description="Set of allowed origins for CORS. All allowed by default.",
         title="CORS-Allowed-Origins",
@@ -136,10 +139,8 @@ class Settings(BaseSettings):
         """
         Validate the STORAGE_PATH file extension based on STORAGE_TYPE.
         """
-        expected_suffix = '.db' if self.STORAGE_TYPE == StorageTypeEnum.SQLITE else '.json'
-
-        if self.STORAGE_PATH.suffix != expected_suffix:
-            self.STORAGE_PATH = self.STORAGE_PATH.with_suffix(expected_suffix)
+        if self.STORAGE_PATH.suffix != '.json':
+            raise ValueError(f"STORAGE_PATH must have a .json extension, got '{self.STORAGE_PATH.suffix}'.")
 
         return self
 
@@ -159,7 +160,7 @@ class StateEnum(str, Enum):
     """
     IN_PROGRESS = "in_progress"
     FAILED = "failed"
-    DONE = "completed"
+    COMPLETED = "completed"
 
 
 class PreprocessBaseModel(PreprocessorBaseConfig):
@@ -169,12 +170,6 @@ class PreprocessBaseModel(PreprocessorBaseConfig):
     1. Optional fields that are commonly used.
     2. Expert mode fields that are less commonly used.
     """
-    stop_on_fail: Annotated[bool, Field(
-        default=True,
-        alias="stop_on_fail",
-        description="Whether to stop the preprocessing process if an error occurs during preprocessing.",
-        title="Stop-On-Fail",
-    )]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -289,7 +284,7 @@ class PreprocessResponseModel(PreprocessBaseModel):
             v: URL or string to convert to url-string.
 
         Returns:
-
+            URL as string.
         """
         if isinstance(v, HttpUrl):
             return str(v)

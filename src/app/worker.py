@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 import tempfile
 from huggingface_hub import HfApi
-from fastapi.concurrency import run_in_threadpool
 
 from loguru import logger
 
@@ -40,15 +39,15 @@ def upload_status_to_huggingface(
         status_dict = status.model_dump(by_alias=True, mode='json')
         repo_id = status_dict['huggingface_target_repo_name']
 
-        # Create temporary file with the status
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as temp_file:
-            json.dump(status_dict, temp_file, ensure_ascii=False, indent=2, default=str)
-            temp_path = temp_file.name
+        # Use TemporaryDirectory for guaranteed cleanup (even on crashes)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir) / "preprocessing_status.json"
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(status_dict, f, ensure_ascii=False, indent=2, default=str)
 
-        try:
             # Upload to HuggingFace
             api.upload_file(
-                path_or_fileobj=temp_path,
+                path_or_fileobj=str(temp_path),
                 path_in_repo='preprocessing_status.json',
                 repo_id=repo_id,
                 repo_type='dataset',
@@ -56,12 +55,9 @@ def upload_status_to_huggingface(
                 commit_message=f"Add preprocessing status for job {status.request_id[:8]}",
             )
 
-            logger.info(f"Successfully uploaded status to {repo_id}/preprocessing_status.json")
-            return True
+        logger.info(f"Successfully uploaded status to {repo_id}/preprocessing_status.json")
+        return True
 
-        finally:
-            # Clean up temporary file
-            Path(temp_path).unlink(missing_ok=True)
 
     except Exception as e:
         logger.error(f"Failed to upload status to HuggingFace: {e}")
@@ -106,6 +102,7 @@ def preprocess_task(
             "append",
         }
     )
+    created_status_copy = created_status.model_copy(deep=True)
     logger.debug(f"Created status: {created_status_dict}")
 
     # Create the Preprocessor instance
@@ -116,56 +113,53 @@ def preprocess_task(
         )
         if source_type == SourceTypeEnum.ZIP:
             preprocessor = ZipPreprocessor(
-                input_path=created_status.source,
+                input_path=created_status_copy.source,
                 config=preprocessor_config,
             )
         else:  # source_type == SourceTypeEnum.HUGGINGFACE
             preprocessor = HuggingFacePreprocessor(
-                input_path=created_status.source,
+                input_path=created_status_copy.source,
                 config=preprocessor_config,
             )
         logger.info(f"Preprocessor created for {source_type.value}")
 
         # Run preprocessing
         preprocessor.preprocess()
-        logger.info(f"Preprocessing completed successfully for request {created_status.request_id}")
+        logger.info(f"Preprocessing completed successfully for request {created_status_copy.request_id}")
 
     except Exception as e:
-        logger.exception(f"Preprocessing failed for request {created_status.request_id}: {e}")
-        created_status.state = StateEnum.FAILED
+        logger.exception(f"Preprocessing failed for request {created_status_copy.request_id}: {e}")
+        created_status_copy.state = StateEnum.FAILED
 
         # Update status in repository
-        created_status.runtime_seconds = (datetime.now() - created_status.created_at).total_seconds()
-        repository.save(created_status)
-
-        if created_status.stop_on_fail:
-            raise
+        created_status_copy.runtime_seconds = (datetime.now() - created_status_copy.created_at).total_seconds()
+        repository.save(created_status_copy)
         return
 
     # Update status with preprocessing results
-    created_status.state = StateEnum.DONE
-    created_status.runtime_seconds = (datetime.now() - created_status.created_at).total_seconds()
+    created_status_copy.state = StateEnum.COMPLETED
+    created_status_copy.runtime_seconds = (datetime.now() - created_status_copy.created_at).total_seconds()
 
     # Update statistics from preprocessor
     if hasattr(preprocessor.converter, 'stats_cache'):
         stats_cache = preprocessor.converter.stats_cache
-        created_status.total_pages = stats_cache.get("total_pages", 0)
-        created_status.total_regions = stats_cache.get("total_regions", 0)
-        created_status.total_lines = stats_cache.get("total_lines", 0)
-        created_status.average_regions_per_page = stats_cache.get("avg_regions_per_page", 0.0)
-        created_status.average_lines_per_page = stats_cache.get("avg_lines_per_page", 0.0)
+        created_status_copy.total_pages = stats_cache.get("total_pages", 0)
+        created_status_copy.total_regions = stats_cache.get("total_regions", 0)
+        created_status_copy.total_lines = stats_cache.get("total_lines", 0)
+        created_status_copy.average_regions_per_page = stats_cache.get("avg_regions_per_page", 0.0)
+        created_status_copy.average_lines_per_page = stats_cache.get("avg_lines_per_page", 0.0)
 
     # Save final status to repository
-    repository.save(created_status)
-    logger.info(f"Final status saved for request {created_status.request_id}")
+    repository.save(created_status_copy)
+    logger.info(f"Final status saved for request {created_status_copy.request_id}")
 
     # Upload status to HuggingFace dataset so creator can see what happened
-    if created_status.huggingface_target_repo_name:
+    if created_status_copy.huggingface_target_repo_name:
         upload_success = upload_status_to_huggingface(
-            status=created_status,
+            status=created_status_copy,
             huggingface_token=huggingface_token,
         )
         if upload_success:
-            logger.info(f"Status uploaded to HuggingFace dataset {created_status.huggingface_target_repo_name}")
+            logger.info(f"Status uploaded to HuggingFace dataset {created_status_copy.huggingface_target_repo_name}")
         else:
             logger.warning(f"Could not upload status to HuggingFace dataset")

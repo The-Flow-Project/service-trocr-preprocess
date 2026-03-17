@@ -5,12 +5,13 @@ Microservice to preprocess TrOCR training material with XML files.
 ## Features
 
 - 🚀 FastAPI-based REST API
-- 🔒 API key authentication
-- 📊 Two storage options: SQLite (recommended) or JSON
+- 🔒 API key authentication (timing-safe)
+- 📊 JSON-based status storage with thread-safe persistence
 - 📤 Automatic JSON export for automation tools and HuggingFace upload
 - 🔄 Background task processing
 - 📈 Real-time status tracking
-- ⚡ Thread-safe operations
+- ⚡ Thread-safe operations via `threading.Lock`
+- 🛡️ HTTPS redirect & docs disabled in production mode
 
 ## Installation
 
@@ -28,7 +29,7 @@ If you prefer using `pip install`, you need to create a `requirements.txt` file 
 
 ```bash
 uv pip compile pyproject.toml -o requirements.txt
-````
+```
 
 ## Configuration
 
@@ -41,36 +42,32 @@ ENVIRONMENT=development
 # API Key (required)
 API_KEY=your_secret_api_key_here
 
-# Storage type: "sqlite" (recommended) or "json"
-STORAGE_TYPE=sqlite
+# Storage type (currently only "json" is supported)
+STORAGE_TYPE=json
 
-# Storage file path
-STORAGE_PATH=./preprocessing-status.db
+# Storage file path (must have .json extension)
+STORAGE_PATH=./preprocessing-status.json
 
-# JSON export path (for automation tools & HuggingFace)
+# JSON export path (for automation tools, written on shutdown)
 JSON_EXPORT_PATH=./preprocessing-status.json
 
 # Log level: TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_LEVEL=INFO
 
-# CORS middleware seetings
+# CORS middleware settings
 CORS_ALLOWED_ORIGINS='["http://localhost:3000", "http://127.0.0.1:3000"]'
 CORS_ALLOWED_HEADERS='["Content-Type", "X-API-KEY"]'
 CORS_ALLOWED_METHODS='["GET", "POST", "OPTIONS"]'
 ```
 
-### Storage Options
+### Storage
 
-**SQLite (recommended for production):**
-- ✅ Thread-safe, no race conditions
-- ✅ Fast with indexes
-- ✅ Automatic JSON export for automation
+The service uses a **JSON-based storage backend**. All task statuses are held in an in-memory dictionary and persisted to a JSON file on every write. Concurrent writes from background tasks are protected by a `threading.Lock`.
+
+- ✅ Human-readable — inspect statuses directly in the JSON file
+- ✅ Thread-safe via `threading.Lock`
+- ✅ Zero external dependencies (no database driver needed)
 - ✅ Single file, easy to backup
-
-**JSON (good for development):**
-- ✅ Human-readable
-- ✅ Easy to debug
-- ✅ File-locking prevents race conditions
 
 See [STORAGE.md](STORAGE.md) for detailed documentation.
 
@@ -79,11 +76,12 @@ See [STORAGE.md](STORAGE.md) for detailed documentation.
 ```bash
 # Set environment variables
 export API_KEY=your_api_key_here
-export STORAGE_TYPE=sqlite
-export STORAGE_PATH=./preprocessing-status.db
 
-# Start the service
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# Start the service (development)
+uv run uvicorn src.app.main:app --reload
+
+# Or without uv
+uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### Using Docker
@@ -112,14 +110,13 @@ docker-compose logs -f
 # Build image
 docker build -t service-trocr-preprocess .
 
-# Run container with health check
+# Run container
 docker run -d \
   --name trocr-preprocess \
   -p 8000:8000 \
   -v $(pwd)/data:/data \
   -e API_KEY=your_api_key_here \
-  -e STORAGE_TYPE=sqlite \
-  -e STORAGE_PATH=/data/preprocessing-status.db \
+  -e STORAGE_PATH=/data/preprocessing-status.json \
   -e JSON_EXPORT_PATH=/data/preprocessing-status.json \
   service-trocr-preprocess
 
@@ -171,10 +168,17 @@ curl -H "X-API-KEY: your_api_key_here" \
   http://localhost:8000/status/{request_id}
 ```
 
+### Health Check
+
+```bash
+# No API key required
+curl http://localhost:8000/health
+```
+
 ## Documentation
 
 - [Storage Documentation](STORAGE.md) - Detailed storage system documentation
-- API Documentation: http://localhost:8000/docs (when running)
+- API Documentation: http://localhost:8000/docs (development mode only)
 
 ## License
 

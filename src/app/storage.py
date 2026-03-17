@@ -6,7 +6,7 @@ Provides a synchronous JSON-based storage backend:
 """
 import json
 from pathlib import Path
-from typing import List, Optional, Dict
+import threading
 
 from loguru import logger
 
@@ -25,12 +25,14 @@ class StatusRepository:
         Args:
             json_path: Path to the JSON file for persistence
         """
+        self._lock = threading.Lock()
         self.json_path = json_path
-        self._data: Dict[str, PreprocessResponseModel] = {}
+        self._data: dict[str, PreprocessResponseModel] = {}
 
         # Create parent directories if they don't exist
         self.json_path.parent.mkdir(parents=True, exist_ok=True)
-        self._load()
+        with self._lock:
+            self._load()
         logger.info(f"Initialized StatusRepository with {len(self._data)} records from {self.json_path}")
 
     def _load(self) -> None:
@@ -75,11 +77,12 @@ class StatusRepository:
         Save or update a preprocessing status synchronously.
         Updates memory and persists to file.
         """
-        self._data[status.request_id] = status
-        self._save_to_file()
-        logger.info(f"Saved status for request {status.request_id}")
+        with self._lock:
+            self._data[status.request_id] = status
+            self._save_to_file()
+            logger.info(f"Saved status for request {status.request_id}")
 
-    def get_by_id(self, request_id: str) -> Optional[PreprocessResponseModel]:
+    def get_by_id(self, request_id: str) -> PreprocessResponseModel | None:
         """
         Retrieve a status by its request ID synchronously.
 
@@ -89,9 +92,10 @@ class StatusRepository:
         Returns:
             PreprocessResponseModel or None if not found
         """
-        return self._data.get(request_id)
+        with self._lock:
+            return self._data.get(request_id)
 
-    def get_all(self) -> List[PreprocessResponseModel]:
+    def get_all(self) -> list[PreprocessResponseModel]:
         """
         Retrieve all statuses ordered by creation date (newest first).
 
@@ -99,26 +103,41 @@ class StatusRepository:
             List of PreprocessResponseModel
         """
         # Sort values by created_at descending
-        return sorted(
-            list(self._data.values()),
-            key=lambda x: x.created_at,
-            reverse=True
-        )
+        with self._lock:
+            return sorted(
+                list(self._data.values()),
+                key=lambda x: x.created_at,
+                reverse=True
+            )
 
-    def export_to_json(self, output_path: Path, request_id: Optional[str] = None) -> None:
+    def flush(self) -> None:
+        """
+        Persist current in-memory state to disk (thread-safe).
+        Intended for use during shutdown or explicit save points.
+        """
+        with self._lock:
+            self._save_to_file()
+            logger.info(f"Flushed {len(self._data)} statuses to {self.json_path}")
+
+    def export_to_json(self, output_path: Path, request_id: str | None = None) -> None:
         """Export all or one status to a JSON file for automation tools."""
         # Ensure output directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if request_id:
-            status = self.get_by_id(request_id)
-            data = [status.model_dump(by_alias=True, mode='json')] if status else []
-        else:
-            statuses = self.get_all()
-            data = [status.model_dump(by_alias=True, mode='json') for status in statuses]
+        with self._lock:
+            if request_id:
+                status = self._data.get(request_id)
+                data = [status.model_dump(by_alias=True, mode='json')] if status else []
+            else:
+                statuses = sorted(
+                    list(self._data.values()),
+                    key=lambda x: x.created_at,
+                    reverse=True,
+                )
+                data = [status.model_dump(by_alias=True, mode='json') for status in statuses]
 
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2, default=str)
 
         logger.info(f"Exported {len(data)} statuses to {output_path}")
 

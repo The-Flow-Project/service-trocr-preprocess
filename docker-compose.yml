@@ -11,8 +11,7 @@ services:
     env_file:
       - .env
     environment:
-      - STORAGE_PATH=/data/preprocessing-status.db
-      - JSON_EXPORT_PATH=/data/preprocessing-status.json
+      - STORAGE_PATH=/data/preprocessing-status.json
 
     volumes:
       # Persist data
@@ -46,9 +45,4 @@ services:
 networks:
   default:
     name: trocr-network
-
-# Volumes for persistent data storage
-volumes:
-  data:
-    driver: local
 

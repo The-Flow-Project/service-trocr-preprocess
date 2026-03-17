@@ -11,8 +11,8 @@ ENV PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
     UV_CACHE_DIR=/tmp/uv-cache
 
-# Install uv (faster than pip!)
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Install uv (pinned version for reproducible builds)
+COPY --from=ghcr.io/astral-sh/uv:0.10.11 /uv /usr/local/bin/uv
 
 # Install build dependencies (only in builder stage)
 RUN apt-get update && apt-get install -y --no-install-recommends \
