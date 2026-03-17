@@ -26,6 +26,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
+from anyio import to_thread
 
 from . import __version__
 from .models import (
@@ -251,8 +252,8 @@ def _create_and_start_preprocess(
         )
     )
     logger.info(f"Preprocess status created: {preprocess_status}")
-    # Save initial status
-    repository.save(preprocess_status)
+    # Save initial status without blocking the event loop
+    await to_thread.run_sync(repository.save, preprocess_status)
     logger.info(
         f"Created preprocessing job {preprocess_status.request_id} for {source_type.value} source"
     )
