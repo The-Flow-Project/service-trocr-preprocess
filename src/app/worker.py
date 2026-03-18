@@ -87,6 +87,7 @@ def preprocess_task(
     created_status_dict = created_status.model_dump(
         by_alias=True,
         include={
+            "export_mode",
             "crop",
             "huggingface_target_repo_name",
             "huggingface_target_repo_private",

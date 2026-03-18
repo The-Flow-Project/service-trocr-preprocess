@@ -26,7 +26,6 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
-from anyio import to_thread
 
 from . import __version__
 from .models import (
@@ -253,7 +252,7 @@ def _create_and_start_preprocess(
     )
     logger.info(f"Preprocess status created: {preprocess_status}")
     # Save initial status without blocking the event loop
-    await to_thread.run_sync(repository.save, preprocess_status)
+    repository.save(preprocess_status)
     logger.info(
         f"Created preprocessing job {preprocess_status.request_id} for {source_type.value} source"
     )
@@ -294,12 +293,13 @@ async def start_zip_preprocess(
     Returns:
         PreprocessResponseModel: The status of the newly created preprocess job.
     """
-    return _create_and_start_preprocess(
+    response_status = _create_and_start_preprocess(
         background_tasks=background_tasks,
         preprocess_parameters=preprocess_parameters,
         repository=repository,
         source_type=SourceTypeEnum.ZIP,
     )
+    return response_status
 
 
 @app.post(
@@ -326,12 +326,13 @@ async def start_hf_preprocess(
     Returns:
         PreprocessResponseModel: The status of the newly created preprocess job.
     """
-    return _create_and_start_preprocess(
+    response_status = _create_and_start_preprocess(
         background_tasks=background_tasks,
         preprocess_parameters=preprocess_parameters,
         repository=repository,
         source_type=SourceTypeEnum.HUGGINGFACE,
     )
+    return response_status
 
 
 @app.get(
