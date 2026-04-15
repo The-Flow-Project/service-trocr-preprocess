@@ -6,13 +6,14 @@ import json
 from pathlib import Path
 import tempfile
 from huggingface_hub import HfApi
+from pydantic import SecretStr
 
 from loguru import logger
 
-from .models import PreprocessResponseModel, PreprocessRequestModel, StateEnum, SourceTypeEnum
+from .models import PreprocessResponseModel, StateEnum, SourceTypeEnum
 from .storage import StatusRepository
 
-from flow_preprocessing import ZipPreprocessor, HuggingFacePreprocessor
+from flow_preprocessing import ZipPreprocessor, HuggingFacePreprocessor, PreprocessorConfig
 
 
 def upload_status_to_huggingface(
@@ -100,6 +101,7 @@ def preprocess_task(
             "split_seed",
             "split_shuffle",
             "allow_empty_lines",
+            "augmentation_loops",
             "append",
         }
     )
@@ -108,8 +110,8 @@ def preprocess_task(
 
     # Create the Preprocessor instance
     try:
-        preprocessor_config = PreprocessRequestModel(
-            huggingface_token=huggingface_token,
+        preprocessor_config = PreprocessorConfig(
+            huggingface_token=SecretStr(huggingface_token) if huggingface_token else None,
             **created_status_dict
         )
         if source_type == SourceTypeEnum.ZIP:
