@@ -103,6 +103,16 @@ class Settings(BaseSettings):
         title="Log-To-Files",
     )]
 
+    # HTTPS Redirect
+    HTTPS_REDIRECT: Annotated[bool, Field(
+        default=True,
+        alias="https_redirect",
+        description="Whether to enable the HTTPS redirect middleware. "
+                    "Set to False when running behind a reverse proxy (e.g. Traefik) "
+                    "that handles TLS termination to avoid redirect loops.",
+        title="HTTPS-Redirect",
+    )]
+
     # CORS Settings
     CORS_ALLOWED_ORIGINS: Annotated[set[str], Field(
         default={"*"},

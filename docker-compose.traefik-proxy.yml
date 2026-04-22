@@ -1,0 +1,60 @@
+# docker-compose.traefik-proxy.yml
+#
+# Shared Traefik reverse proxy – run ONCE per machine, not per app.
+# All apps on this host connect via the external "traefik-public" network
+# and register themselves through Docker labels.
+#
+# ⚠️  NOTE: If you already have a Traefik instance running on this host
+# (e.g. via ~/webapps/docker-compose-traefik.yml), DO NOT start this file.
+# Use docker-compose.traefik.yml directly and join the existing network instead.
+#
+# Setup (one-time, on a fresh host):
+#   docker network create traefik-public
+#   docker compose -f docker-compose.traefik-proxy.yml up -d
+#
+# Required .env variables:
+#   ACME_EMAIL  – e-mail address for Let's Encrypt notifications
+
+services:
+  traefik:
+    image: traefik:v3
+    container_name: traefik-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    command:
+      # Docker provider – only expose containers with traefik.enable=true
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik-public"
+
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+
+      # Global HTTP → HTTPS redirect
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+
+      # Let's Encrypt (ACME) via HTTP-01 challenge
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "letsencrypt-data:/letsencrypt"
+    networks:
+      - traefik-public
+
+volumes:
+  letsencrypt-data:
+    driver: local
+
+networks:
+  traefik-public:
+    external: true  # Must be created manually: docker network create traefik-public
+
+

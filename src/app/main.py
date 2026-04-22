@@ -135,7 +135,8 @@ app.add_middleware(
 )
 
 # 3) HTTPS Redirect (registered last → executes first on incoming requests)
-if settings.is_production:
+#    Disable via HTTPS_REDIRECT=false when TLS is terminated by a reverse proxy (e.g. Traefik).
+if settings.is_production and settings.HTTPS_REDIRECT:
     app.add_middleware(HTTPSRedirectMiddleware)
     logger.info("HTTPS Redirect Middleware enabled for production environment")
 
