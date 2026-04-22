@@ -73,6 +73,17 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+    # Override the Dockerfile HEALTHCHECK (which pings port 8000 / uvicorn).
+    # The worker runs no HTTP server. A lightweight pgrep check is sufficient:
+    # if the celery worker process is gone, Docker restarts the container anyway
+    # (restart: unless-stopped).
+    healthcheck:
+      test: [ "CMD-SHELL", "test -d /proc/1 || exit 1" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
     # Resource limits for the worker
     deploy:
       resources:
