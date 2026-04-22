@@ -69,9 +69,12 @@ services:
       - "traefik.enable=true"
       # Explicitly tell Traefik which network to use (container is on two networks)
       - "traefik.docker.network=traefik_net"
-      # Router
+      # HTTPS router – TLS termination + Let's Encrypt certificate
+      # HTTP→HTTPS redirect is handled globally by the Traefik entrypoint config,
+      # so this router only needs to listen on websecure (port 443).
       - "traefik.http.routers.trocr.rule=Host(`${APP_DOMAIN}`)"
-      - "traefik.http.routers.trocr.entrypoints=web,websecure"
+      - "traefik.http.routers.trocr.entrypoints=websecure"
+      - "traefik.http.routers.trocr.tls=true"
       - "traefik.http.routers.trocr.tls.certresolver=letsencrypt"
       # Backend port (uvicorn listens on 8000 inside the container)
       - "traefik.http.services.trocr.loadbalancer.server.port=8000"
