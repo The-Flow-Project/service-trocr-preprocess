@@ -11,6 +11,11 @@ ENV PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
     UV_CACHE_DIR=/root/.cache/uv
 
+# Torch variant: "cpu" (default, ~300 MB) or "cu128" / "cu126" / "cu124" (CUDA, ~2.5 GB).
+# Must match the CUDA version installed on the host (check: nvidia-smi).
+# Example: docker compose build --build-arg TORCH_VARIANT=cu128
+ARG TORCH_VARIANT=cpu
+
 # Install uv (pinned version for reproducible builds)
 COPY --from=ghcr.io/astral-sh/uv:0.10.11 /uv /usr/local/bin/uv
 
@@ -29,6 +34,18 @@ COPY pyproject.toml uv.lock /app/
 # --no-install-workspace: Installs only dependencies, not the local package
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-workspace
+
+# Reinstall torch/torchvision from the CUDA index if a GPU variant is requested.
+# Uses --no-deps to only swap the torch wheels without touching other packages.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    if [ "${TORCH_VARIANT}" != "cpu" ]; then \
+        echo "Installing GPU torch variant: ${TORCH_VARIANT}" && \
+        uv pip install \
+            "torch==2.7.1+${TORCH_VARIANT}" \
+            "torchvision==0.22.1+${TORCH_VARIANT}" \
+            --index-url "https://download.pytorch.org/whl/${TORCH_VARIANT}" \
+            --no-deps; \
+    fi
 
 # ================================
 # Stage 2: Runtime
