@@ -823,7 +823,7 @@ wheels = [
 [[package]]
 name = "flow-preprocessing"
 version = "0.7.2"
-source = { git = "https://github.com/The-Flow-Project/package-preprocessing#3cec9701f99e6653fe59d220d900bfe896235b11" }
+source = { git = "https://github.com/The-Flow-Project/package-preprocessing#cb786943e95bf3f0f889b4ba583602da09328d97" }
 dependencies = [
     { name = "flow-segmenter" },
     { name = "lxml" },
@@ -839,7 +839,7 @@ dependencies = [
 [[package]]
 name = "flow-segmenter"
 version = "0.2.4"
-source = { git = "https://github.com/The-Flow-Project/package-segmenter#b9ea919f7428e26043d6dff213e4863e60ef8e50" }
+source = { git = "https://github.com/The-Flow-Project/package-segmenter#9443200e5b5c8fce207f906bb01ce5cc0b3ab6a7" }
 dependencies = [
     { name = "datasets" },
     { name = "htrflow" },
@@ -2193,7 +2193,7 @@ wheels = [
 [[package]]
 name = "pagexml-hf"
 version = "0.9.2+fork.1"
-source = { git = "https://github.com/The-Flow-Project/pagexml-hf#161f636e3bee4a8fb399a29261355947fe78e0cb" }
+source = { git = "https://github.com/The-Flow-Project/pagexml-hf#7e8f1ce43052a88c4798a2be62c195b3ba6cb8c5" }
 dependencies = [
     { name = "chardet" },
     { name = "datasets" },
