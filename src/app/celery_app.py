@@ -13,10 +13,8 @@ from datetime import datetime, UTC, timedelta
 from app.models import Settings, PreprocessResponseModel, StateEnum
 from app.storage import get_redis_repository
 from app.worker import upload_status_to_huggingface
-from app.logging_config import setup_logger
 
 settings = Settings()
-setup_logger(settings.LOG_LEVEL, process_name="worker", log_files=settings.LOG_TO_FILES)
 
 ##### Celery instance #####
 celery_app = Celery(

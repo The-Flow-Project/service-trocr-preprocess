@@ -2193,7 +2193,7 @@ wheels = [
 [[package]]
 name = "pagexml-hf"
 version = "0.9.2+fork.1"
-source = { git = "https://github.com/The-Flow-Project/pagexml-hf#7e8f1ce43052a88c4798a2be62c195b3ba6cb8c5" }
+source = { git = "https://github.com/The-Flow-Project/pagexml-hf#247a9159358ad96cd4c3c68eae4ab2a10b982d25" }
 dependencies = [
     { name = "chardet" },
     { name = "datasets" },

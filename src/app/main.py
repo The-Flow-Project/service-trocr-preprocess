@@ -39,7 +39,7 @@ from app.storage import RedisStatusRepository, get_redis_repository
 
 # ── Settings & Logging ────────────────────────────────────────────────
 settings = Settings()
-setup_logger(settings.LOG_LEVEL, process_name="api", log_files=settings.LOG_TO_FILES)
+setup_logger(settings.LOG_LEVEL, log_files=settings.LOG_TO_FILES)
 
 api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
 
