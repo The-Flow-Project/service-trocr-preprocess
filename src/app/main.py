@@ -4,7 +4,6 @@ Main script Flow Preprocessing Service
 import time
 from contextlib import asynccontextmanager
 import secrets
-from functools import lru_cache
 
 from fastapi import (
     FastAPI,
@@ -13,7 +12,6 @@ from fastapi import (
     HTTPException,
     status,
     Security,
-    BackgroundTasks,
     Request,
 )
 from fastapi.security import APIKeyHeader
@@ -27,51 +25,23 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
-from . import __version__
-from .models import (
+from app import __version__
+from app.logging_config import setup_logger
+from app.models import (
     Settings,
     ZipPreprocessRequestModel,
     HuggingfacePreprocessRequestModel,
     PreprocessResponseModel,
-    SourceTypeEnum,
+    SourceTypeEnum, StateEnum,
 )
-from .worker import preprocess_task
-from .storage import create_repository, StatusRepository
-from .logging_config import setup_logger
+from app.tasks import preprocess_task
+from app.storage import RedisStatusRepository, get_redis_repository
 
-
-# Configure loguru logger
-@lru_cache
-def get_settings() -> Settings:
-    """
-    Factory-function to get the settings object.
-    """
-    return Settings()
-
-
-settings = get_settings()
-setup_logger(level=settings.LOG_LEVEL.value)
+# ── Settings & Logging ────────────────────────────────────────────────
+settings = Settings()
+setup_logger(settings.LOG_LEVEL, process_name="api", log_files=settings.LOG_TO_FILES)
 
 api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
-
-# Storage configuration
-STORAGE_PATH = settings.STORAGE_PATH
-
-
-def get_repository() -> StatusRepository:
-    """
-    Dependency function to get the repository from app.state.
-
-    Returns:
-        StatusRepository: The initialized repository instance.
-
-    Raises:
-        RuntimeError: If repository is not initialized.
-    """
-    if not hasattr(app.state, 'repository') or app.state.repository is None:
-        logger.error("Repository not initialized!")
-        raise RuntimeError("Repository not initialized. Check lifespan configuration.")
-    return app.state.repository
 
 
 async def check_api_key(api_key: str | None = Security(api_key_header)) -> None:
@@ -108,31 +78,16 @@ async def lifespan(app: FastAPI):
     """
     Asynchronous context manager for FastAPI application lifespan events.
 
-    Initializes the storage repository on startup and exports to JSON on shutdown.
+    Initializes the Redis status repository on startup and cleans up on shutdown.
     Uses app.state to store the repository.
-
-    Args:
-        app: The FastAPI application instance.
-
-    Yields:
-        None: This function does not yield any value.
     """
-    # Startup - Store repository in app.state
-    logger.info(f"Initializing repository at {STORAGE_PATH}")
-    app.state.repository = create_repository(path=STORAGE_PATH)
+    logger.info(f"Initializing Redis repository at {settings.REDIS_URL}")
+    app.state.repository = get_redis_repository(redis_url=settings.REDIS_URL)
     logger.info("Repository initialized successfully")
 
     yield
 
-    # Shutdown - Export final status and close repository
     logger.info("Shutting down service...")
-
-    try:
-        app.state.repository.export_to_json(STORAGE_PATH)
-        logger.info(f"Exported final status to {STORAGE_PATH}")
-    except Exception as e:
-        logger.error(f"Failed to export to JSON on shutdown: {e}")
-
     try:
         app.state.repository.close()
         logger.info("Repository closed successfully")
@@ -223,19 +178,20 @@ async def log_requests(request: Request, call_next):
 
 
 def _create_and_start_preprocess(
-        background_tasks: BackgroundTasks,
         preprocess_parameters: ZipPreprocessRequestModel | HuggingfacePreprocessRequestModel,
-        repository: StatusRepository,
+        repository: RedisStatusRepository,
         source_type: SourceTypeEnum,
 ) -> PreprocessResponseModel:
     """
-    Helper function to create and start a preprocess job.
+    Helper function to create and dispatch a preprocess job via Celery.
 
     Args:
-        background_tasks: The background tasks object, injected by FastAPI.
-        preprocess_parameters: The preprocess parameters.
+        preprocess_parameters: The preprocess parameters from the API request.
         repository: The storage repository, injected via dependency injection.
         source_type: The type of source (ZIP or HuggingFace).
+
+    Returns:
+        PreprocessResponseModel: The initial status of the newly created job.
     """
     # Extract token securely from SecretStr (never logged)
     huggingface_token = (
@@ -245,25 +201,32 @@ def _create_and_start_preprocess(
     )
 
     preprocess_status = PreprocessResponseModel(
+        state=StateEnum.PENDING,
         **preprocess_parameters.model_dump(
             by_alias=True,
             exclude={"huggingface_token"}
         )
     )
     logger.info(f"Preprocess status created: {preprocess_status}")
-    # Save initial status without blocking the event loop
+
+    # Save initial status (in_progress) to shared storage
     repository.save(preprocess_status)
     logger.info(
         f"Created preprocessing job {preprocess_status.request_id} for {source_type.value} source"
     )
 
-    # Start the preprocess job
-    background_tasks.add_task(
-        preprocess_task,
-        repository=repository,
-        huggingface_token=huggingface_token,
-        created_status=preprocess_status,
-        source_type=source_type,
+    # Dispatch Celery task (non-blocking)
+    preprocess_task.apply_async(
+        kwargs={
+            "status_dict": preprocess_status.model_dump(
+                by_alias=True,
+                mode="json",
+                exclude={"huggingface_token"}
+            ),
+            "huggingface_token": huggingface_token,
+            "source_type": source_type.value,
+        },
+        task_id=preprocess_status.request_id,
     )
 
     return preprocess_status
@@ -278,23 +241,19 @@ def _create_and_start_preprocess(
     dependencies=[Depends(check_api_key)],
 )
 async def start_zip_preprocess(
-        background_tasks: BackgroundTasks,
         preprocess_parameters: ZipPreprocessRequestModel = Body(...),
-        repository: StatusRepository = Depends(get_repository),
 ) -> PreprocessResponseModel:
     """
     Start a new preprocess job with a ZIP-URL.
 
     Args:
-        background_tasks: The background tasks object, injected by FastAPI.
         preprocess_parameters: The preprocess parameters.
-        repository: The storage repository, injected via dependency injection.
 
     Returns:
         PreprocessResponseModel: The status of the newly created preprocess job.
     """
+    repository = app.state.repository
     response_status = _create_and_start_preprocess(
-        background_tasks=background_tasks,
         preprocess_parameters=preprocess_parameters,
         repository=repository,
         source_type=SourceTypeEnum.ZIP,
@@ -311,25 +270,20 @@ async def start_zip_preprocess(
     dependencies=[Depends(check_api_key)],
 )
 async def start_hf_preprocess(
-        background_tasks: BackgroundTasks,
         preprocess_parameters: HuggingfacePreprocessRequestModel = Body(...),
-        repository: StatusRepository = Depends(get_repository),
 ) -> PreprocessResponseModel:
     """
     Start a new preprocess job with a HuggingFace repository name.
 
     Args:
-        background_tasks: The background tasks object, injected by FastAPI.
         preprocess_parameters: The preprocess parameters.
-        repository: The storage repository, injected via dependency injection.
 
     Returns:
         PreprocessResponseModel: The status of the newly created preprocess job.
     """
     response_status = _create_and_start_preprocess(
-        background_tasks=background_tasks,
         preprocess_parameters=preprocess_parameters,
-        repository=repository,
+        repository=app.state.repository,
         source_type=SourceTypeEnum.HUGGINGFACE,
     )
     return response_status
@@ -342,19 +296,14 @@ async def start_hf_preprocess(
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(check_api_key)],
 )
-async def get_all_preprocess_statuses(
-        repository: StatusRepository = Depends(get_repository),
-) -> list[PreprocessResponseModel]:
+async def get_all_preprocess_statuses() -> list[PreprocessResponseModel]:
     """
     Retrieve all preprocess statuses.
-
-    Args:
-        repository: The storage repository, injected via dependency injection.
 
     Returns:
         list[PreprocessResponseModel]: A list of all preprocess statuses (may be empty).
     """
-    return repository.get_all()
+    return app.state.repository.get_all()
 
 
 @app.get(
@@ -366,14 +315,12 @@ async def get_all_preprocess_statuses(
 )
 async def get_preprocess_status(
         uuid: str,
-        repository: StatusRepository = Depends(get_repository),
 ) -> PreprocessResponseModel:
     """
     Retrieve a preprocess status by its UUID.
 
     Args:
         uuid: The UUID of the preprocess status to retrieve.
-        repository: The storage repository, injected via dependency injection.
 
     Returns:
         PreprocessResponseModel: The preprocess status with the specified UUID.
@@ -381,7 +328,7 @@ async def get_preprocess_status(
     Raises:
         HTTPException: If no preprocess status with the specified UUID is found.
     """
-    status_obj = repository.get_by_id(uuid)
+    status_obj = app.state.repository.get_by_id(uuid)
     if not status_obj:
         logger.info(f"Preprocess job not found: {uuid}")
         raise HTTPException(status_code=404, detail="Preprocess job not found")
@@ -409,8 +356,13 @@ def health_check(request: Request):
     try:
         if hasattr(app.state, 'repository') and app.state.repository is not None:
             health_data["repository"] = "initialized"
-            health_data["storage_type"] = settings.STORAGE_TYPE.value
-            health_data["storage_path"] = str(settings.STORAGE_PATH)
+            health_data["storage_type"] = "redis"
+
+            if app.state.repository.ping():
+                health_data["redis"] = "connected"
+            else:
+                health_data["redis"] = "disconnected"
+                health_data["status"] = "degraded"
         else:
             health_data["repository"] = "not_initialized"
             health_data["status"] = "degraded"

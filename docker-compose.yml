@@ -1,4 +1,20 @@
 services:
+  # ── Redis (message broker + status storage) ────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: trocr-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI service ────────────────────────────────────────────────
   trocr-preprocess:
     image: service-trocr-preprocess:latest
     build:
@@ -11,16 +27,10 @@ services:
     env_file:
       - .env
     environment:
-      - STORAGE_PATH=/data/preprocessing-status.json
-
-    volumes:
-      # Persist data
-      - ./data:/data
-
-      # Optional: Mount app for development (hot reload)
-      # Uncomment for development:
-      # - ./src:/app/src
-
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
     # Health check
@@ -41,7 +51,40 @@ services:
           cpus: '1.0'
           memory: 1G
 
-# Optional: Networks for multi-container setups
+  # ── Celery worker ──────────────────────────────────────────────────
+  celery-worker:
+    image: service-trocr-preprocess:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    pull_policy: missing
+    container_name: trocr-celery-worker
+    command: celery -A app.tasks worker --loglevel=${LOG_LEVEL:-info} --concurrency=2
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+    # Resource limits for the worker
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+
+# ── Volumes ──────────────────────────────────────────────────────────
+volumes:
+  redis-data:
+    driver: local
+
+# ── Networks ─────────────────────────────────────────────────────────
 networks:
   default:
     name: trocr-network

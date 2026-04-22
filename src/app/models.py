@@ -1,9 +1,8 @@
 """
 Models for the preprocessing service.
 """
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
-from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
@@ -13,14 +12,12 @@ from pydantic import (
     HttpUrl,
     SecretStr,
     field_validator,
-    model_validator,
 )
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from flow_preprocessing import PreprocessorBaseConfig
 
 __all__ = [
-    "StorageTypeEnum",
     "LogLevelEnum",
     "SourceTypeEnum",
     "EnvironmentEnum",
@@ -32,14 +29,6 @@ __all__ = [
     "HuggingfacePreprocessRequestModel",
     "PreprocessResponseModel",
 ]
-
-
-class StorageTypeEnum(str, Enum):
-    """
-    Enum class for storage types.
-    """
-    # SQLITE = "sqlite"
-    JSON = "json"
 
 
 class LogLevelEnum(str, Enum):
@@ -91,19 +80,13 @@ class Settings(BaseSettings):
         title="Environment",
     )]
 
-    # Storage Settings
-    STORAGE_TYPE: Annotated[StorageTypeEnum, Field(
-        default=StorageTypeEnum.JSON,
-        alias="storage_type",
-        description="Type of storage to use for preprocessing status (atm only json).",
-        title="Storage-Type",
-    )]
-    STORAGE_PATH: Annotated[Path, Field(
-        default=Path("./preprocessing-status.json"),
-        alias="storage_path",
-        description="Path to the storage file for preprocessing status.",
-        title="Storage-Path",
-        examples=["./data/preprocessing-status.json"],
+    # Redis / Celery Settings
+    REDIS_URL: Annotated[str, Field(
+        default="redis://localhost:6379/0",
+        alias="redis_url",
+        description="Redis connection URL used as Celery broker and status storage backend.",
+        title="Redis-URL",
+        examples=["redis://localhost:6379/0", "redis://redis:6379/0"],
     )]
 
     # Logging
@@ -112,6 +95,12 @@ class Settings(BaseSettings):
         alias="log_level",
         description="Log level for the preprocessing service.",
         title="Log-Level",
+    )]
+    LOG_TO_FILES: Annotated[bool, Field(
+        default=False,
+        alias="log_to_files",
+        description="Whether to log to files or not.",
+        title="Log-To-Files",
     )]
 
     # CORS Settings
@@ -134,16 +123,6 @@ class Settings(BaseSettings):
         title="CORS-Allowed-Methods",
     )]
 
-    @model_validator(mode="after")
-    def validate_storage_path(self) -> "Settings":
-        """
-        Validate the STORAGE_PATH file extension based on STORAGE_TYPE.
-        """
-        if self.STORAGE_PATH.suffix != '.json':
-            raise ValueError(f"STORAGE_PATH must have a .json extension, got '{self.STORAGE_PATH.suffix}'.")
-
-        return self
-
     @property
     def is_production(self) -> bool:
         """
@@ -158,6 +137,7 @@ class StateEnum(str, Enum):
     """
     Enum class for the state of the process.
     """
+    PENDING = "pending"
     IN_PROGRESS = "in_progress"
     FAILED = "failed"
     COMPLETED = "completed"
@@ -166,9 +146,6 @@ class StateEnum(str, Enum):
 class PreprocessBaseModel(PreprocessorBaseConfig):
     """
     Base model for preprocess requests (zip and huggingface) and responses.
-    Common fields for both requests and responses.
-    1. Optional fields that are commonly used.
-    2. Expert mode fields that are less commonly used.
     """
 
     model_config = ConfigDict(
@@ -225,11 +202,23 @@ class PreprocessResponseModel(PreprocessBaseModel):
         description="Source of the data to preprocess. Can be Zip-URL or Huggingface-Repo-Name.",
         title="Source",
     )]
-    created_at: Annotated[datetime, Field(
-        default_factory=datetime.now,
+    created_at: Annotated[datetime | None, Field(
+        default_factory=lambda: datetime.now(UTC),
         alias="created_at",
         description="Timestamp of the preprocess status creation.",
         title="Created-At",
+    )]
+    started_at: Annotated[datetime | None, Field(
+        default=None,
+        alias="started_at",
+        description="Timestamp of the preprocess start.",
+        title="Started-At",
+    )]
+    ended_at: Annotated[datetime | None, Field(
+        default=None,
+        alias="ended_at",
+        description="Timestamp of the preprocess ended.",
+        title="Ended-At",
     )]
     runtime_seconds: Annotated[float, Field(
         default=0.0,
@@ -238,11 +227,23 @@ class PreprocessResponseModel(PreprocessBaseModel):
         title="Runtime",
     )]
     state: Annotated[StateEnum, Field(
-        default=StateEnum.IN_PROGRESS,
+        default=StateEnum.PENDING,
         alias="state",
         description="Current state of the preprocess status."
                     "Can be 'in_progress', 'failed', or 'done'.",
         title="State",
+    )]
+    retry_count: Annotated[int, Field(
+        default=0,
+        alias="retry_count",
+        description="Number of times the celery task has started.",
+        title="Retry-Count",
+    )]
+    error_message: Annotated[str | None, Field(
+        default=None,
+        alias="error_message",
+        description="Error message during preprocess.",
+        title="Error-Message",
     )]
     total_pages: Annotated[int, Field(
         default=0,
