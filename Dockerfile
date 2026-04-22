@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1 \
     UV_SYSTEM_PYTHON=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    UV_CACHE_DIR=/tmp/uv-cache
+    UV_CACHE_DIR=/root/.cache/uv
 
 # Install uv (pinned version for reproducible builds)
 COPY --from=ghcr.io/astral-sh/uv:0.10.11 /uv /usr/local/bin/uv
@@ -27,7 +27,7 @@ COPY pyproject.toml uv.lock /app/
 
 # Install dependencies with uv - way faster!
 # --no-install-workspace: Installs only dependencies, not the local package
-RUN --mount=type=cache,target=/tmp/uv-cache \
+RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-workspace
 
 # ================================

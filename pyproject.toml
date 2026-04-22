@@ -32,6 +32,8 @@ dependencies = [
     "redis>=7.4.0",
     "slowapi>=0.1.9",
     "uvicorn[standard]>=0.41.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
 ]
 keywords = [
     "flow-project",
@@ -53,8 +55,15 @@ keywords = [
 Homepage = "https://flow-project.net"
 Repository = "https://github.com/The-Flow-Project/service-trocr-preprocess"
 
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 [tool.uv.sources]
 flow-preprocessing = { git = "https://github.com/The-Flow-Project/package-preprocessing" }
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
 
 [tool.setuptools]
 package-dir = { "" = "src" }
