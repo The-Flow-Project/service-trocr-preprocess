@@ -75,6 +75,7 @@ def _run_preprocessing(
     config_fields = {
         k: status_dict.get(k, None) for k in PreprocessorConfig.model_fields
     }
+    config_hf_token = None
     if "huggingface_token" in config_fields:
         config_hf_token = config_fields["huggingface_token"]
         config_fields.pop("huggingface_token")

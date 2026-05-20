@@ -64,7 +64,6 @@ def before_task_publish_handler(headers=None, body=None, **kwargs):
 
     status = PreprocessResponseModel(
         request_id=task_id,
-        task_name=task_name,
         state=StateEnum.PENDING,
         created_at=datetime.now(UTC),
         **kwargs,
