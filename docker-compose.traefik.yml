@@ -89,7 +89,6 @@ services:
     command: celery -A app.tasks worker --loglevel=${LOG_LEVEL:-info} --concurrency=${CELERY_CONCURRENCY:-2}
     env_file:
       - .env
-      - .dockerenv
     environment:
       - REDIS_URL=redis://redis:6379/0
     depends_on:
