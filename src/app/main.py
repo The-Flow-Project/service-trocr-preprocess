@@ -107,7 +107,7 @@ app = FastAPI(
 
 limiter = Limiter(
     key_func=get_remote_address,
-    default_limits=["100 per day", "10/minute"],
+    default_limits=["10/minute"],
 )
 
 # ── Middleware Stack ──────────────────────────────────────────────────
@@ -297,7 +297,7 @@ async def start_hf_preprocess(
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(check_api_key)],
 )
-async def get_all_preprocess_statuses() -> list[PreprocessResponseModel]:
+async def get_all_preprocess_statuses(request: Request) -> list[PreprocessResponseModel]:
     """
     Retrieve all preprocess statuses.
 
@@ -315,7 +315,7 @@ async def get_all_preprocess_statuses() -> list[PreprocessResponseModel]:
     dependencies=[Depends(check_api_key)],
 )
 async def get_preprocess_status(
-        uuid: str,
+    uuid: str,
 ) -> PreprocessResponseModel:
     """
     Retrieve a preprocess status by its UUID.
@@ -338,7 +338,6 @@ async def get_preprocess_status(
 
 
 @app.get("/health")
-@limiter.limit("4/minute")
 def health_check(request: Request):
     """
     Health check endpoint to verify the service is running.

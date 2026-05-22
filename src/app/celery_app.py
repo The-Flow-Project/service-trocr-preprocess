@@ -34,9 +34,9 @@ celery_app = Celery(
     task_acks_late=True,
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=1000,
-    result_expires=timedelta(172800) if settings.is_production else timedelta(3600),  # production 48h, dev 1h
-    task_time_limit=3600,  # 1 hour
-    task_soft_time_limit=3300,  # 55 minutes
+    result_expires=timedelta(settings.CELERY_TASK_TIME_LIMIT),
+    task_time_limit=settings.CELERY_TASK_TIME_LIMIT,
+    task_soft_time_limit=settings.CELERY_TASK_SOFT_TIME_LIMIT,
 )
 
 redis_repository = get_redis_repository(redis_url=settings.REDIS_URL)

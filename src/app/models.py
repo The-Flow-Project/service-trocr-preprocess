@@ -132,6 +132,18 @@ class Settings(BaseSettings):
         description="Set of allowed methods for CORS. GET and POST allowed by default.",
         title="CORS-Allowed-Methods",
     )]
+    CELERY_TASK_TIME_LIMIT: Annotated[int, Field(
+        default=3600,
+        alias="celery_task_time_limit",
+        description="Time limit for the celery task in seconds.",
+        title="Celery-Task-Timelimit",
+    )]
+    CELERY_TASK_SOFT_TIME_LIMIT: Annotated[int, Field(
+        default=3300,
+        alias="celery_task_soft_time_limit",
+        description="Soft time limit for the celery task in seconds.",
+        title="Celery-Task-Soft-Timelimit",
+    )]
 
     @property
     def is_production(self) -> bool:
