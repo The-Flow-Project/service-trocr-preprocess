@@ -34,7 +34,7 @@ celery_app = Celery(
     task_acks_late=True,
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=1000,
-    result_expires=timedelta(settings.CELERY_TASK_TIME_LIMIT),
+    result_expires=timedelta(seconds=settings.CELERY_TASK_TIME_LIMIT),
     task_time_limit=settings.CELERY_TASK_TIME_LIMIT,
     task_soft_time_limit=settings.CELERY_TASK_SOFT_TIME_LIMIT,
 )

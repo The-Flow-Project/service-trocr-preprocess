@@ -25,8 +25,8 @@ _settings = Settings()
     autoretry_for=(Exception,),
     max_retries=3,
     retry_backoff=True,
-    time_limit=1200,
-    soft_time_limit=1000,
+    time_limit=_settings.CELERY_TASK_TIME_LIMIT,
+    soft_time_limit=_settings.CELERY_TASK_SOFT_TIME_LIMIT,
 )
 def preprocess_task(
         self,
