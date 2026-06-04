@@ -4,7 +4,7 @@ ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 # ================================
 # Stage 1: Builder (shared)
 # ================================
-FROM ghcr.io/astral-sh/uv:0.10.11-python3.12-bookworm-slim AS builder
+FROM astral/uv:python3.12-bookworm-slim AS builder
 
 ARG TORCH_VERSION=2.7.1
 ARG TORCHVISION_VERSION=0.22.1
