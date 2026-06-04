@@ -5,10 +5,10 @@
 # and the "traefik_net" network exists.
 #
 # Usage:
-#   docker compose -f docker-compose.traefik.yml up --build -d
+#   CPU:  docker compose -f docker-compose.traefik.yml up --build -d
+#   GPU:  docker compose -f docker-compose.traefik.yml -f docker-compose.gpu.yml up --build -d
 #
 # Variables (in .env or hardcoded in this file):
-#   TORCH_VARIANT     – e.g. "cpu" (default) or "cu128" (for CUDA 12.8)
 #   APP_DOMAIN        – public hostname, e.g. preprocessing.flow-project.net
 #   HTTPS_REDIRECT    – must be set to "false" (Traefik handles the redirect)
 #   LOG_LEVEL         – log level for both FastAPI and Celery (default: "info")
@@ -36,8 +36,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        TORCH_VARIANT: ${TORCH_VARIANT:-cpu}
+      target: runtime-cpu
     pull_policy: missing
     container_name: service-trocr-preprocess
     # No direct port exposure – Traefik handles all ingress
@@ -82,8 +81,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        TORCH_VARIANT: ${TORCH_VARIANT:-cpu}
+      target: runtime-cpu
     pull_policy: missing
     container_name: trocr-celery-worker
     command: celery -A app.tasks worker --loglevel=${LOG_LEVEL:-info} --concurrency=${CELERY_CONCURRENCY:-2}

@@ -4,7 +4,6 @@
 #   docker compose -f docker-compose.yml up --build -d
 #
 # Variables (in .env or hardcoded in this file):
-#   TORCH_VARIANT     – e.g. "cpu" (default) or "cu128" (for CUDA 12.8)
 #   CELERY_CONCURRENCY – number of worker processes for the Celery worker (default: 2)
 #   LOG_LEVEL         – log level for both FastAPI and Celery (default: "info")
 
@@ -30,8 +29,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        TORCH_VARIANT: ${TORCH_VARIANT:-cpu}
+      target: runtime-cpu
     pull_policy: missing
     container_name: service-trocr-preprocess
     ports:
@@ -60,8 +58,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        TORCH_VARIANT: ${TORCH_VARIANT:-cpu}
+      target: runtime-cpu
     pull_policy: missing
     container_name: trocr-celery-worker
     command: celery -A app.tasks worker --loglevel ${LOG_LEVEL} --concurrency ${CELERY_CONCURRENCY}
