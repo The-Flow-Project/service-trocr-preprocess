@@ -79,6 +79,9 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 # AIDEV-NOTE: Ubuntu 22.04 (CUDA base) ships Python 3.10; 3.12 is installed via deadsnakes PPA
 FROM ${CUDA_RUNTIME_IMAGE} AS runtime-gpu
 
+# AIDEV-NOTE: cudnn-runtime does not ship libcupti; install the matching cuda-cupti package explicitly
+ARG CUDA_CUPTI_PKG_VERSION=12-4
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     && add-apt-repository ppa:deadsnakes/ppa \
@@ -92,6 +95,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libxrender1 \
     curl \
+    cuda-cupti-${CUDA_CUPTI_PKG_VERSION} \
     && ln -sf /usr/bin/python3.12 /usr/local/bin/python \
     && ln -sf /usr/bin/python3.12 /usr/local/bin/python3 \
     && apt-get clean \
