@@ -1,7 +1,7 @@
 # docker-compose.traefik-proxy.yml
 #
 # Shared Traefik reverse proxy – run ONCE per machine, not per app.
-# All apps on this host connect via the external "traefik_net" network
+# All apps on this host connect via the external "traefik-public" network
 # and register themselves through Docker labels.
 #
 # ⚠️  NOTE: If you already have a Traefik instance running on this host
@@ -9,7 +9,7 @@
 # Use docker-compose.traefik.yml directly and join the existing network instead.
 #
 # Setup (one-time, on a fresh host):
-#   docker network create traefik_net
+#   docker network create traefik-public
 #   docker compose -f docker-compose.traefik-proxy.yml up -d
 #
 # Required .env variables:
@@ -27,7 +27,7 @@ services:
       # Docker provider – only expose containers with traefik.enable=true
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=traefik_net"
+      - "--providers.docker.network=traefik-public"
 
       # Entrypoints
       - "--entrypoints.web.address=:80"
@@ -47,7 +47,7 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "letsencrypt-data:/letsencrypt"
     networks:
-      - traefik_net
+      - traefik-public
 
 volumes:
   letsencrypt-data:
@@ -55,6 +55,6 @@ volumes:
 
 networks:
   traefik:
-    external: true  # Must be created manually: docker network create traefik_net
+    external: true  # Must be created manually: docker network create traefik-public
 
 

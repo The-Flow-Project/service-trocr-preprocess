@@ -2,7 +2,7 @@
 #
 # Production setup – connects to the existing shared Traefik proxy on this host.
 # Prerequisite: Traefik is already running via ~/webapps/docker-compose-traefik.yml
-# and the "traefik_net" network exists.
+# and the "traefik-public" network exists.
 #
 # Usage:
 #   CPU:  docker compose -f docker-compose.traefik.yml up --build -d
@@ -61,7 +61,7 @@ services:
     labels:
       - "traefik.enable=true"
       # Explicitly tell Traefik which network to use (container is on two networks)
-      - "traefik.docker.network=traefik_net"
+      - "traefik.docker.network=traefik-public"
       # HTTPS router – TLS termination + Let's Encrypt certificate
       # HTTP→HTTPS redirect is handled globally by the Traefik entrypoint config,
       # so this router only needs to listen on websecure (port 443).
@@ -73,7 +73,7 @@ services:
       - "traefik.http.services.trocr.loadbalancer.server.port=8000"
     networks:
       - trocr-network  # can reach Redis
-      - traefik_net    # Traefik can reach this container
+      - traefik-public    # Traefik can reach this container
 
   # ── Celery worker ──────────────────────────────────────────────────
   celery-worker:
@@ -114,6 +114,6 @@ networks:
     # Private network for inter-service communication (Redis ↔ App ↔ Worker)
     name: trocr-network
 
-  traefik_net:
+  traefik-public:
     # Shared Traefik network – managed by ~/webapps/docker-compose-traefik.yml
     external: true
