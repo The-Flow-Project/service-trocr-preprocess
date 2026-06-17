@@ -4,14 +4,13 @@ Microservice to preprocess TrOCR training material with XML files.
 
 ## Features
 
-- 🚀 FastAPI-based REST API
-- 🔒 API key authentication (timing-safe)
-- 📊 JSON-based status storage with thread-safe persistence
-- 📤 Automatic JSON export for automation tools and HuggingFace upload
-- 🔄 Background task processing
-- 📈 Real-time status tracking
-- ⚡ Thread-safe operations via `threading.Lock`
-- 🛡️ HTTPS redirect & docs disabled in production mode
+- FastAPI-based REST API
+- API key authentication (timing-safe)
+- Redis-backed status storage
+- Automatic JSON export for automation tools and HuggingFace upload
+- Background task processing via Celery
+- Real-time status tracking
+- HTTPS redirect & docs disabled in production mode
 
 ## Installation
 
@@ -42,13 +41,8 @@ ENVIRONMENT=development
 # API Key (required)
 API_KEY=your_secret_api_key_here
 
-# Storage type (currently only "json" is supported)
-STORAGE_TYPE=json
-
-# Storage file path (must have .json extension)
-STORAGE_PATH=./preprocessing-status.json
-
-# JSON export uses the same file as STORAGE_PATH (e.g. for automation tools)
+# Redis connection URL (used as Celery broker and status storage)
+REDIS_URL=redis://localhost:6379/0
 
 # Log level: TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_LEVEL=INFO
@@ -61,26 +55,25 @@ CORS_ALLOWED_METHODS='["GET", "POST", "OPTIONS"]'
 
 ### Storage
 
-The service uses a **JSON-based storage backend**. All task statuses are held in an in-memory dictionary and persisted to a JSON file on every write. Concurrent writes from background tasks are protected by a `threading.Lock`.
+The service uses a **Redis-backed storage backend**. All task statuses are stored as fields in a single Redis Hash (`preprocess:statuses`).
 
-- ✅ Human-readable — inspect statuses directly in the JSON file
-- ✅ Thread-safe via `threading.Lock`
-- ✅ Zero external dependencies (no database driver needed)
-- ✅ Single file, easy to backup
+- Human-readable JSON values per status entry
+- No additional database driver needed beyond `redis-py`
+- Single `REDIS_URL` configures both Celery broker and status storage
 
 See [STORAGE.md](STORAGE.md) for detailed documentation.
 
 ## Running the Service
 
 ```bash
-# Set environment variables
-export API_KEY=your_api_key_here
+# Start Redis
+docker compose up redis -d
 
-# Start the service (development)
+# Start the API server (development)
 uv run uvicorn src.app.main:app --reload
 
-# Or without uv
-uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --reload
+# Start the Celery worker (separate terminal)
+cd src && uv run celery -A app.tasks worker --loglevel=debug
 ```
 
 ### Using Docker
@@ -92,42 +85,25 @@ uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --reload
 cp .env.example .env
 nano .env  # Set your API_KEY
 
-# Start service
-docker-compose up -d
+# Start all services (Redis, API, Celery Worker)
+docker compose up --build
 
 # Check health status
-docker-compose ps
+docker compose ps
 curl http://localhost:8000/health
 
 # View logs
-docker-compose logs -f
-```
+docker compose logs -f
 
-**With Dockerfile only:**
-
-```bash
-# Build image
-docker build -t service-trocr-preprocess .
-
-# Run container
-docker run -d \
-  --name trocr-preprocess \
-  -p 8000:8000 \
-  -v $(pwd)/data:/data \
-  -e API_KEY=your_api_key_here \
-  -e STORAGE_PATH=/data/preprocessing-status.json \
-  -e JSON_EXPORT_PATH=/data/preprocessing-status.json \
-  service-trocr-preprocess
-
-# Check health status
-docker ps
+# Follow Celery worker logs
+docker compose logs celery-worker -f
 ```
 
 **Health Check:**
 
-- ✅ Automatic health monitoring built into Docker
-- ✅ Checks `/health` endpoint every 30 seconds
-- ✅ Container marked as unhealthy after 3 failed checks
+- Automatic health monitoring built into Docker
+- Checks `/health` endpoint every 30 seconds
+- Container marked as unhealthy after 3 failed checks
 
 ## API Usage
 
@@ -182,4 +158,3 @@ curl http://localhost:8000/health
 ## License
 
 MIT
-
