@@ -32,7 +32,7 @@ celery_app = Celery(
 
     task_track_started=True,
     task_acks_late=True,
-    worker_prefetch_multiplier=1,
+    worker_prefetch_multiplier=2,
     worker_max_tasks_per_child=1000,
     result_expires=timedelta(seconds=settings.CELERY_TASK_TIME_LIMIT),
     task_time_limit=settings.CELERY_TASK_TIME_LIMIT,
@@ -55,7 +55,6 @@ def before_task_publish_handler(headers=None, body=None, **kwargs):
         kwargs = info.get("kwargs", {})
 
     task_id = info.get("task_id")
-    task_name = info.get("task")
 
     if redis_repository.get_by_id(task_id):
         logger.warning(f"Task {task_id} already exists")
@@ -128,13 +127,14 @@ def task_postrun_handler(task_id=None, state=None, retval=None, kwargs=None, **k
 
 @task_failure.connect
 def task_failure_handler(task_id=None, exception=None, einfo=None, sender=None, **kwargs):
-    """Fire when task fails."""
-    logger.info(f"Task {task_id} failure")
+    """Fire when a task fails terminally.
 
-    # IF retries remain, task_retry already handeld the state update
-    if sender and sender.request.retries < sender.max_retries:
-        logger.info(f"Task {task_id} will retry, skipping failure handler")
-        return
+    AIDEV-NOTE: task_failure only fires on terminal failure — a pending retry
+    raises Retry and triggers task_retry instead, never this handler. So we must
+    NOT gate on remaining retries here, or fatal errors before retries are
+    exhausted would leave the job stuck at IN_PROGRESS.
+    """
+    logger.info(f"Task {task_id} failure")
 
     task = redis_repository.get_by_id(task_id)
     if task is None:
