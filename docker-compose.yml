@@ -34,6 +34,9 @@ services:
     container_name: service-trocr-preprocess
     ports:
       - "8000:8000"
+    networks:
+      - default
+      - flow-apis
     env_file:
       - .env
     environment:
@@ -87,6 +90,6 @@ volumes:
 
 # ── Networks ─────────────────────────────────────────────────────────
 networks:
-  default:
-    name: trocr-network
+  flow-apis:
+    external: true
 
