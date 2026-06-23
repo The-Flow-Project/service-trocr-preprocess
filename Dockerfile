@@ -1,5 +1,5 @@
 # CUDA_RUNTIME_IMAGE must be declared before the first FROM to be usable in FROM statements
-ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+ARG CUDA_RUNTIME_IMAGE=nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
 
 # ================================
 # Stage 1: Builder (shared)
@@ -95,7 +95,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libxrender1 \
     curl \
-    cuda-cupti-${CUDA_CUPTI_PKG_VERSION} \
+    cuda-cusparse-12-6 \
+    cuda-cusparse-dev-12-6 \
     && ln -sf /usr/bin/python3.12 /usr/local/bin/python \
     && ln -sf /usr/bin/python3.12 /usr/local/bin/python3 \
     && apt-get clean \

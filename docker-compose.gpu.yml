@@ -20,7 +20,6 @@ services:
         TORCHVISION_VERSION: ${TORCHVISION_VERSION}
         TORCH_VARIANT: ${TORCH_VARIANT}
         CUDA_RUNTIME_IMAGE: ${CUDA_RUNTIME_IMAGE}
-        CUDA_CUPTI_PKG_VERSION: ${CUDA_CUPTI_PKG_VERSION}
     deploy: &gpu-deploy
       resources:
         reservations:
@@ -37,5 +36,4 @@ services:
         TORCHVISION_VERSION: ${TORCHVISION_VERSION}
         TORCH_VARIANT: ${TORCH_VARIANT}
         CUDA_RUNTIME_IMAGE: ${CUDA_RUNTIME_IMAGE}
-        CUDA_CUPTI_PKG_VERSION: ${CUDA_CUPTI_PKG_VERSION}
     deploy: *gpu-deploy
