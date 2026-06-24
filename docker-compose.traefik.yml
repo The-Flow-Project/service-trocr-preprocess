@@ -36,7 +36,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: runtime-cpu
+      target: runtime
     pull_policy: missing
     container_name: service-trocr-preprocess
     # No direct port exposure – Traefik handles all ingress
@@ -81,7 +81,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: runtime-cpu
+      target: runtime
     pull_policy: missing
     container_name: trocr-celery-worker
     command: celery -A app.tasks worker --loglevel=${LOG_LEVEL:-info} --concurrency=${CELERY_CONCURRENCY:-2}
