@@ -36,6 +36,7 @@ services:
     image: redis:7-alpine
     volumes:
       - redis-data:/data
+    container_name: preprocess-redis
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
@@ -45,8 +46,9 @@ services:
     networks:
       - flow-apis        # internal only; never on traefik-public
 
-  trocr-preprocess:
+  service-preprocess:
     <<: *app
+    container_name: service-trocr-preprocess
     # no ports here — see docker-compose.override.yml (dev) / traefik.yml (prod)
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
@@ -57,6 +59,7 @@ services:
 
   celery-worker:
     <<: *app
+    container_name: preprocess-celery-worker
     command: celery -A app.tasks worker --loglevel ${LOG_LEVEL:-INFO} --concurrency ${CELERY_CONCURRENCY:-2}
 
 volumes:
