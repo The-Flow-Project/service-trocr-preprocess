@@ -65,4 +65,4 @@ volumes:
 
 networks:
   flow-apis:
-    name: flow-apis
+    external: true
