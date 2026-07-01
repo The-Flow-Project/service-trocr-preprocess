@@ -24,7 +24,8 @@ pip install uv
 uv sync
 ```
 
-If you prefer using `pip install`, you need to create a `requirements.txt` file first with:
+If you prefer using `pip install`, you need to create a `requirements.txt` file
+first with:
 
 ```bash
 uv pip compile pyproject.toml -o requirements.txt
@@ -55,7 +56,8 @@ CORS_ALLOWED_METHODS='["GET", "POST", "OPTIONS"]'
 
 ### Storage
 
-The service uses a **Redis-backed storage backend**. All task statuses are stored as fields in a single Redis Hash (`preprocess:statuses`).
+The service uses a **Redis-backed storage backend**. All task statuses are
+stored as fields in a single Redis Hash (`preprocess:statuses`).
 
 - Human-readable JSON values per status entry
 - No additional database driver needed beyond `redis-py`
@@ -65,45 +67,81 @@ See [STORAGE.md](STORAGE.md) for detailed documentation.
 
 ## Running the Service
 
+### Locally (without Docker)
+
+Handy for quick iteration with hot-reload. Point `REDIS_URL` at `localhost` in
+your
+`.env` (see [Configuration](#configuration)) and run each process in its own
+terminal:
+
 ```bash
 # Start Redis
 docker compose up redis -d
 
-# Start the API server (development)
+# Start the API server (development, hot-reload)
 uv run uvicorn src.app.main:app --reload
 
 # Start the Celery worker (separate terminal)
 cd src && uv run celery -A app.tasks worker --loglevel=debug
 ```
 
-### Using Docker
+### With Docker Compose
 
-**With Docker Compose (recommended):**
+The stack is split across three files so the same core definition serves both
+dev and prod:
+
+| File                          | Role                                                                                          |
+|-------------------------------|-----------------------------------------------------------------------------------------------|
+| `docker-compose.yml`          | Core services — Redis, API, Celery worker. The app port is **not** published here.            |
+| `docker-compose.override.yml` | **Local dev only.** Auto-merged on a bare `docker compose up`; publishes the app on `:8000`.  |
+| `docker-compose.traefik.yml`  | **Prod overlay** for a shared [Traefik](https://traefik.io) proxy (TLS + routing via labels). |
+
+First-time setup for any variant:
 
 ```bash
-# Setup environment
 cp .env.example .env
-nano .env  # Set your API_KEY
-
-# Start all services (Redis, API, Celery Worker)
-docker compose up --build
-
-# Check health status
-docker compose ps
-curl http://localhost:8000/health
-
-# View logs
-docker compose logs -f
-
-# Follow Celery worker logs
-docker compose logs celery-worker -f
+nano .env            # set API_KEY (required); set APP_DOMAIN + HTTPS_REDIRECT=false for Traefik
 ```
 
-**Health Check:**
+#### 1. Local development (default)
 
-- Automatic health monitoring built into Docker
-- Checks `/health` endpoint every 30 seconds
-- Container marked as unhealthy after 3 failed checks
+A bare `up` auto-merges `docker-compose.override.yml`, so the API is reachable
+directly:
+
+```bash
+docker compose up -d --build          # Redis + API + Celery worker
+
+docker compose ps                     # health/status
+curl http://localhost:8000/health
+docker compose logs -f                # all services
+docker compose logs celery-worker -f  # just the worker
+```
+
+The app is then at http://localhost:8000 (interactive docs at `/docs` in
+development mode).
+
+#### 2. Production behind Traefik
+
+Passing explicit `-f` flags **disables the override**, so no host port is
+published — traffic
+only reaches the app through Traefik (routed by the `APP_DOMAIN` label).
+Requires an external
+`traefik-public` network and a running Traefik instance:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
+```
+
+Drop `--build` if you build/push the image in CI and only pull it on the host
+(`pull_policy` is `missing`). If you also need to run the Traefik proxy itself,
+see
+`docker-compose.traefik-proxy.yml`.
+
+**Health check:** the API service defines a Docker health check that polls
+`/health` every
+30s (unhealthy after 3 failures, 30s start grace). It is scoped to the API
+only — the Celery
+worker runs no HTTP server and is intentionally left without one.
 
 ## API Usage
 
