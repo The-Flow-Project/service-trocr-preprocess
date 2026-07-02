@@ -1,13 +1,16 @@
 # docker-compose.traefik.yml — overlay for the shared Traefik proxy.
 #   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d
 # (no --build-arg on `up`; CPU image needs none)
+#
+# Required .env variables:
+#   APP_DOMAIN
 
 services:
   service-preprocess:
     environment:
       - HTTPS_REDIRECT=false          # Traefik terminates TLS / handles redirect
     networks:
-      - flow-apis
+      - preprocess-network
       - traefik-public
     labels:
       - "traefik.enable=true"

@@ -1,7 +1,7 @@
 # docker-compose.yml — core service definition (shared by dev and prod).
 #
 #   Dev:   docker compose up -d --build
-#          (auto-loads docker-compose.override.yml → publishes :8000)
+#          (autoloads docker-compose.override.yml → publishes :8000)
 #   Prod:  docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
 #          (explicit -f disables the override → no host port, Traefik only.
 #           --build keeps the running image in sync with the source; drop it if you
@@ -29,14 +29,15 @@ x-app: &app
       condition: service_healthy
   restart: unless-stopped
   networks:
-    - flow-apis          # app AND worker inherit this → both can reach redis
+    - preprocess-network          # app AND worker inherit this → both can reach redis
 
 services:
+  # ── Redis (message broker + status storage) ────────────────────────
   redis:
     image: redis:7-alpine
+    container_name: preprocess-redis
     volumes:
       - redis-data:/data
-    container_name: preprocess-redis
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
@@ -44,8 +45,9 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - flow-apis        # internal only; never on traefik-public
+      - preprocess-network  # internal only; never on traefik-public
 
+  # ── FastAPI service ────────────────────────────────────────────────
   service-preprocess:
     <<: *app
     container_name: service-trocr-preprocess
@@ -67,5 +69,5 @@ volumes:
     driver: local
 
 networks:
-  flow-apis:
+  preprocess-network:
     external: true
