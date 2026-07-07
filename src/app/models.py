@@ -82,11 +82,12 @@ class Settings(BaseSettings):
 
     # Redis / Celery Settings
     REDIS_URL: Annotated[str, Field(
-        default="redis://localhost:6379/0",
+        default="redis://redis:6379/0",
         alias="redis_url",
-        description="Redis connection URL used as Celery broker and status storage backend.",
+        description="Redis connection URL used as Celery broker"
+                    "and status storage backend. (Note: Port is not exposed)",
         title="Redis-URL",
-        examples=["redis://localhost:6379/0", "redis://redis:6379/0"],
+        examples=["redis://redis:6379/0"],
     )]
 
     # Logging
@@ -121,13 +122,13 @@ class Settings(BaseSettings):
         title="CORS-Allowed-Origins",
     )]
     CORS_ALLOWED_HEADERS: Annotated[set[str], Field(
-        default=["*"],
+        default={"*"},
         alias="cors_allowed_headers",
         description="Set of allowed headers for CORS. All allowed by default.",
         title="CORS-Allowed-Headers",
     )]
     CORS_ALLOWED_METHODS: Annotated[set[str], Field(
-        default=["GET", "POST", "OPTIONS"],
+        default={"GET", "POST", "OPTIONS"},
         alias="cors_allowed_methods",
         description="Set of allowed methods for CORS. GET and POST allowed by default.",
         title="CORS-Allowed-Methods",
@@ -152,7 +153,11 @@ class Settings(BaseSettings):
         """
         return self.ENVIRONMENT == EnvironmentEnum.PRODUCTION
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 class StateEnum(str, Enum):

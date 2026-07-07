@@ -1,0 +1,14 @@
+# docker-compose.override.yml — LOCAL DEV ONLY.
+# Auto-merged on a bare `docker compose up`. NOT loaded when you pass explicit
+# -f flags (i.e. the Traefik prod command skips this file), so the port below
+# is never published in production.
+
+services:
+  service-preprocess:
+    ports:
+      - "8000:8000"      # reach the app directly at http://localhost:8000
+
+  # To poke Redis from the host with redis-cli (no auth!), add a ports mapping here:
+  #   redis:
+  #     ports:
+  #       - "127.0.0.1:6379:6379"

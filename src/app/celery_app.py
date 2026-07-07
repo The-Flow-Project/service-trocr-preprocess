@@ -136,15 +136,22 @@ def task_failure_handler(task_id=None, exception=None, einfo=None, sender=None, 
     """
     logger.info(f"Task {task_id} failure")
 
+    if sender and sender.request.retries < sender.max_retries:
+        logger.info(f"Task {task_id} will retry, skipping final failure update")
+        return
+
     task = redis_repository.get_by_id(task_id)
     if task is None:
         logger.warning(f"Task {task_id} not found in repository during failure")
         return
+
     task.state = StateEnum.FAILED
     task.ended_at = datetime.now(UTC)
     task.error_message = str(exception)
+
     if task.started_at:
         task.runtime_seconds = (task.ended_at - task.started_at).total_seconds()
+
     redis_repository.save(task)
 
 

@@ -1,19 +1,41 @@
-# docker-compose.yml
+# docker-compose.yml — core service definition (shared by dev and prod).
 #
-# Usage:
-#   docker compose -f docker-compose.yml up --build -d
+#   Dev:   docker compose up -d --build
+#          (autoloads docker-compose.override.yml → publishes :8000)
+#   Prod:  docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
+#          (explicit -f disables the override → no host port, Traefik only.
+#           --build keeps the running image in sync with the source; drop it if you
+#           build/push in CI and only pull on the host — pull_policy is 'missing'.)
 #
-# Variables (in .env or hardcoded in this file):
-#   CELERY_CONCURRENCY – number of worker processes for the Celery worker (default: 2)
-#   LOG_LEVEL         – log level for both FastAPI and Celery (default: "info")
+# The app port is intentionally NOT published here — dev adds it, prod never does.
+
+x-app: &app
+  image: service-trocr-preprocess:latest
+  build:
+    context: .
+    dockerfile: Dockerfile
+    target: runtime
+  pull_policy: missing
+  env_file:
+    - .env
+  environment:
+    # Hard-coded (not ${REDIS_URL:-…}) so a host-oriented REDIS_URL in .env
+    # (e.g. localhost, for running the app outside Docker) can't leak in and
+    # break service-to-service resolution. Inside the network it's always 'redis'.
+    - REDIS_URL=redis://redis:6379/0
+    - LOG_LEVEL=${LOG_LEVEL:-INFO}
+  depends_on:
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+  networks:
+    - preprocess-network          # app AND worker inherit this → both can reach redis
 
 services:
   # ── Redis (message broker + status storage) ────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: trocr-redis
-    ports:
-      - "6379:6379"
+    container_name: preprocess-redis
     volumes:
       - redis-data:/data
     restart: unless-stopped
@@ -22,32 +44,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - preprocess-network  # internal only; never on traefik-public
 
   # ── FastAPI service ────────────────────────────────────────────────
-  trocr-preprocess:
-    image: service-trocr-preprocess:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime-cpu
-    pull_policy: missing
+  service-preprocess:
+    <<: *app
     container_name: service-trocr-preprocess
-    ports:
-      - "8000:8000"
-    networks:
-      - default
-      - flow-apis
-    env_file:
-      - .env
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-    # Health check
+    # no ports here — see docker-compose.override.yml (dev) / traefik.yml (prod)
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 30s
@@ -55,41 +59,15 @@ services:
       retries: 3
       start_period: 30s
 
-  # ── Celery worker ──────────────────────────────────────────────────
   celery-worker:
-    image: service-trocr-preprocess:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime-cpu
-    pull_policy: missing
-    container_name: trocr-celery-worker
-    command: celery -A app.tasks worker --loglevel ${LOG_LEVEL} --concurrency ${CELERY_CONCURRENCY}
-    env_file:
-      - .env
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - CELERY_CONCURRENCY=${CELERY_CONCURRENCY:-2}
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+    <<: *app
+    container_name: preprocess-celery-worker
+    command: celery -A app.tasks worker --loglevel ${LOG_LEVEL:-INFO} --concurrency ${CELERY_CONCURRENCY:-2}
 
-    healthcheck:
-      test: [ "CMD-SHELL", "test -d /proc/1 || exit 1" ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-
-# ── Volumes ──────────────────────────────────────────────────────────
 volumes:
   redis-data:
     driver: local
 
-# ── Networks ─────────────────────────────────────────────────────────
 networks:
-  flow-apis:
+  preprocess-network:
     external: true
-
