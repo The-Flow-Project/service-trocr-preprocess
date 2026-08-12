@@ -183,6 +183,10 @@ class PreprocessBaseModel(PreprocessorBaseConfig):
 
 
 class PreprocessRequestModel(PreprocessBaseModel):
+    """
+    Base model for preprocess requests, shared by ZIP and HuggingFace sources.
+    """
+
     huggingface_token: Annotated[SecretStr | None, Field(
         default=None,
         alias="huggingface_token",
@@ -195,6 +199,10 @@ class PreprocessRequestModel(PreprocessBaseModel):
 
 
 class ZipPreprocessRequestModel(PreprocessRequestModel):
+    """
+    Request model for starting a preprocess job from a ZIP-URL source.
+    """
+
     zip_url: Annotated[HttpUrl, Field(
         alias="zip_url",
         description="URL of the ZIP file containing the data export to preprocess.",
@@ -205,6 +213,10 @@ class ZipPreprocessRequestModel(PreprocessRequestModel):
 
 
 class HuggingfacePreprocessRequestModel(PreprocessRequestModel):
+    """
+    Request model for starting a preprocess job from a HuggingFace repository source.
+    """
+
     huggingface_source_repo_name: Annotated[str, Field(
         alias="huggingface_source_repo_name",
         description="Name of the Hugging Face repository containing the data export to preprocess."
@@ -217,6 +229,10 @@ class HuggingfacePreprocessRequestModel(PreprocessRequestModel):
 
 
 class PreprocessResponseModel(PreprocessBaseModel):
+    """
+    Status and result of a preprocess job, returned by the API and stored in Redis.
+    """
+
     request_id: Annotated[str, Field(
         default_factory=lambda: str(uuid4()),
         alias="request_id",
