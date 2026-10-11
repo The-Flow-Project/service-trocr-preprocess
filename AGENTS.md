@@ -67,7 +67,10 @@ docker compose logs celery-worker -f  # Follow worker logs
 ```
 
 ### Testing
-- No explicit `tests/` folder. Manual API testing via `/docs` (Swagger UI, development only) or `curl`.
+- **Smoke tests**: `tests/test_api_smoke.py` exercises the API with FastAPI's `TestClient`. Redis and Celery are faked in `tests/conftest.py`, so no broker is required.
+  - Run: `uv run --with pytest --with httpx pytest tests/`
+  - `app.celery_app` pings Redis at import time, so `conftest.py` replaces `app.storage.get_redis_repository` *before* `app.main` is imported. Keep that order when adding fixtures.
+- Manual API testing is still possible via `/docs` (Swagger UI, development only) or `curl`.
 
 ## 🧩 Codebase Conventions
 
