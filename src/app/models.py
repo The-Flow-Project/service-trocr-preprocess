@@ -66,7 +66,8 @@ class Settings(BaseSettings):
         default=None,
         alias="api_key",
         description="API key for authenticating requests to the preprocessing service."
-                    "If not set, no authentication is required.",
+                    " Required: while it is not set, authenticated endpoints answer 500 "
+                    "(server configuration error) instead of allowing all requests.",
         title="API-Key",
         examples=["ThisIsASecure_API_Key1337!"],
     )]
